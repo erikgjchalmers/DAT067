@@ -43,6 +43,21 @@ func main() {
 		vector := result.(model.Vector)
 		printVector(vector)
 		break
+	case model.ValMatrix:
+		matrix := result.(model.Matrix)
+		printMatrix(matrix)
+		break
+	case model.ValScalar:
+		scalar := result.(*model.Scalar)
+		printScalar(*scalar)
+		break
+	case model.ValString:
+		str := result.(*model.String)
+		printString(*str)
+		break
+	case model.ValNone:
+		fmt.Printf("Error: No compatible value type defined for the query result: %v\n", result)
+		os.Exit(1)
 	}
 }
 
@@ -50,4 +65,21 @@ func printVector(v model.Vector) {
 	for _, sample := range v {
 		fmt.Printf("Time stamp: %v, metric: %v, value: %v\n", sample.Timestamp, sample.Metric, sample.Value)
 	}
+}
+
+func printMatrix(m model.Matrix) {
+	for _, sampleStream := range m {
+		fmt.Printf("Metric: %v\n", (*sampleStream).Metric.String())
+		for _, samplePair := range (*sampleStream).Values {
+			fmt.Printf("\tTime stamp; %v, value; %v\n", samplePair.Timestamp, samplePair.Value)
+		}
+	}
+}
+
+func printScalar(s model.Scalar) {
+	fmt.Printf("Time stamp: %v, value: %v\n", s.Timestamp, s.Value.String())
+}
+
+func printString(s model.String) {
+	fmt.Printf("Time stamp: %v, value: %v\n", s.Timestamp, s.Value)
 }
