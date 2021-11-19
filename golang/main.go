@@ -41,6 +41,8 @@ func main() {
 		fmt.Printf("Warnings during query: %v\n", warnings)
 	}
 
+	fmt.Printf("Data from Prometheus:\n\n")
+
 	switch result.Type() {
 	case model.ValVector:
 		vector := result.(model.Vector)
@@ -67,6 +69,8 @@ func main() {
 	 * Creates an Azure retail price API and queries it for resources with the specified filters.
 	 * Returns a QueryResponse type consisting of the response from the API.
 	 */
+	fmt.Printf("Data from Azure retails API:\n\n")
+
 	azureApi := NewApi()
 	response, err := azureApi.Query(QueryFilter{
 		armSkuName:    "Standard_D2as_v4",
@@ -81,6 +85,33 @@ func main() {
 	}
 
 	printAzurePrices(response)
+
+	fmt.Printf("Data from Kubernetes API:\n\n")
+
+	clientSet, err := createClientSet()
+
+	if err != nil {
+		fmt.Printf("An error occured while creating the Kubernetes clientSet: %v", err)
+		os.Exit(1)
+	}
+
+	nodes, err := getNodes(clientSet)
+
+	if err != nil {
+		fmt.Printf("An error occured while retrieving the nodes from Kubernetes: %v", err)
+		os.Exit(1)
+	}
+
+	for _, node := range nodes {
+		fmt.Printf("Node name: %s\n", node.Name)
+		labels := node.Labels
+
+		for key, value := range labels {
+			fmt.Printf("\tLabel name: %s, value: %s\n", key, value)
+		}
+
+		fmt.Printf("\n")
+	}
 }
 
 func printVector(v model.Vector) {
