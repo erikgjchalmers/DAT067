@@ -12,6 +12,9 @@ import (
 )
 
 func main() {
+	/*
+	 * The following code queries Prometheus on localhost using the simple "up" query.
+	 */
 	address := "http://localhost:9090"
 	query := "up"
 
@@ -59,6 +62,24 @@ func main() {
 		fmt.Printf("Error: No compatible value type defined for the query result: %v\n", result)
 		os.Exit(1)
 	}
+
+	/*
+	 * Creates an Azure retail price API and queries it for resources with the specified filters.
+	 * Returns a QueryResponse type consisting of the response from the API.
+	 */
+	azureApi := NewApi()
+	response, err := azureApi.Query(QueryFilter{
+		armSkuName:    "Standard_D2as_v4",
+		armRegionName: "westeurope",
+		currencyCode:  SEK,
+		priceType:     "consumption",
+	})
+
+	if err != nil {
+		fmt.Printf("An error occured while querying the Azure retail price API: %v\n", err)
+	}
+
+	fmt.Printf("Azure response: %v\n", response)
 }
 
 func printVector(v model.Vector) {
