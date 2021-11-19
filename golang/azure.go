@@ -197,7 +197,7 @@ func (a *AzureCostApi) Query(q QueryFilter) (QueryResponse, error) {
 	}
 
 	queryUrl := fmt.Sprintf("%s?%s", AZURE_HOST, filterString)
-	fmt.Printf("Azure query URL: %s\n", queryUrl)
+	fmt.Printf("Azure query URL: %s\n\n", queryUrl)
 
 	res, err := http.Get(queryUrl)
 
