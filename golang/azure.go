@@ -174,9 +174,6 @@ func (q *QueryFilter) String() (string, error) {
 	if strings.HasSuffix(builder.String(), " and ") {
 		finalFilterString = strings.TrimSuffix(builder.String(), " and ")
 	}
-	if strings.HasSuffix(builder.String(), ",$filter=") {
-		finalFilterString = strings.TrimSuffix(builder.String(), ",$filter=")
-	}
 
 	if finalFilterString != "" {
 		params.Add("$filter", finalFilterString)
@@ -215,7 +212,6 @@ func (a *AzureCostApi) Query(q QueryFilter) (QueryResponse, error) {
 		return QueryResponse{}, err
 	}
 
-	strResponse := string(body)
 	response := QueryResponse{}
 
 	err = json.Unmarshal(body, &response)

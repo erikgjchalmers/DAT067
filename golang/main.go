@@ -77,6 +77,7 @@ func main() {
 
 	if err != nil {
 		fmt.Printf("An error occured while querying the Azure retail price API: %v\n", err)
+		os.Exit(1)
 	}
 
 	fmt.Printf("Azure response: %v\n", response)
