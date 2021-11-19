@@ -80,12 +80,26 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Printf("Azure response: %v\n", response)
+	printAzurePrices(response)
 }
 
 func printVector(v model.Vector) {
 	for _, sample := range v {
-		fmt.Printf("Time stamp: %v, metric: %v, value: %v\n", sample.Timestamp, sample.Metric, sample.Value)
+		labelSet := model.LabelSet(sample.Metric)
+
+		metricName := labelSet[model.MetricNameLabel]
+
+		if metricName != "" {
+			fmt.Printf("Metric name: %s, time stamp: %s, value: %v\n", metricName, sample.Timestamp.Time(), sample.Value)
+		}
+
+		for key, value := range labelSet {
+			if key != model.MetricNameLabel {
+				fmt.Printf("\tLabel name: %s, value: %s\n", key, value)
+			}
+		}
+
+		fmt.Printf("\n")
 	}
 }
 
@@ -104,4 +118,14 @@ func printScalar(s model.Scalar) {
 
 func printString(s model.String) {
 	fmt.Printf("Time stamp: %v, value: %v\n", s.Timestamp, s.Value)
+}
+
+func printAzurePrices(r QueryResponse) {
+	fmt.Printf("Currency: %s, customer entity id: %s, customer entity type: %s\n", r.BillingCurrency, r.CustomerEntityId, r.CustomerEntityType)
+
+	for _, item := range r.Items {
+		fmt.Printf("\tRegion: %s, Sku: %s, Price: %f, Price unit of measure: %s\n", item.ArmRegionName, item.ArmSkuName, item.RetailPrice, item.UnitOfMeasure)
+	}
+
+	fmt.Printf("\n")
 }
