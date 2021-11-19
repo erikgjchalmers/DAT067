@@ -8,6 +8,7 @@ import (
 
 	"github.com/prometheus/client_golang/api"
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
+	"github.com/prometheus/common/model"
 )
 
 func main() {
@@ -37,5 +38,16 @@ func main() {
 		fmt.Printf("Warnings during query: %v\n", warnings)
 	}
 
-	fmt.Printf("Result: \n%v\n", result)
+	switch result.Type() {
+	case model.ValVector:
+		vector := result.(model.Vector)
+		printVector(vector)
+		break
+	}
+}
+
+func printVector(v model.Vector) {
+	for _, sample := range v {
+		fmt.Printf("Time stamp: %v, metric: %v, value: %v\n", sample.Timestamp, sample.Metric, sample.Value)
+	}
 }
