@@ -189,6 +189,9 @@ type CostApi interface {
 type AzureCostApi struct {
 }
 
+/*
+ * TODO: Return all pages if number of results are > 100. Maybe include an optional "limit" parameter to limit the amount of returned results?
+ */
 func (a *AzureCostApi) Query(q QueryFilter) (QueryResponse, error) {
 	filterString, err := q.String()
 
