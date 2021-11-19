@@ -124,7 +124,27 @@ func printAzurePrices(r QueryResponse) {
 	fmt.Printf("Currency: %s, customer entity id: %s, customer entity type: %s\n", r.BillingCurrency, r.CustomerEntityId, r.CustomerEntityType)
 
 	for _, item := range r.Items {
-		fmt.Printf("\tRegion: %s, Sku: %s, Price: %f, Price unit of measure: %s\n", item.ArmRegionName, item.ArmSkuName, item.RetailPrice, item.UnitOfMeasure)
+		fmt.Printf("\tarmRegionName: %s\n", item.ArmRegionName)
+		fmt.Printf("\tarmSkuName: %s\n", item.ArmSkuName)
+		fmt.Printf("\tcurrencyCode: %s\n", item.CurrencyCode)
+		fmt.Printf("\teffectiveStartDate: %s\n", item.EffectiveStartDate)
+		fmt.Printf("\tisPrimaryMeterRegion: %v\n", item.IsPrimaryMeterRegion)
+		fmt.Printf("\ttype: %s\n", item.ItemType)
+		fmt.Printf("\tlocation: %s\n", item.Location)
+		fmt.Printf("\tmeterId: %s\n", item.MeterId)
+		fmt.Printf("\tmeterName: %s\n", item.MeterName)
+		fmt.Printf("\tproductId: %s\n", item.ProductId)
+		fmt.Printf("\tproductName: %s\n", item.ProductName)
+		fmt.Printf("\tretailPrice: %f\n", item.RetailPrice)
+		fmt.Printf("\tserviceFamily: %s\n", item.ServiceFamily)
+		fmt.Printf("\tserviceId: %s\n", item.ServiceId)
+		fmt.Printf("\tserviceName: %s\n", item.ServiceName)
+		fmt.Printf("\tskuId: %s\n", item.SkuId)
+		fmt.Printf("\tskuName: %s\n", item.SkuName)
+		fmt.Printf("\ttierMinimumUnits: %d\n", item.TierMinimumUnits)
+		fmt.Printf("\tunitOfMeasure: %s\n", item.UnitOfMeasure)
+		fmt.Printf("\tunitPrice: %f\n", item.UnitPrice)
+		fmt.Printf("\n")
 	}
 
 	fmt.Printf("\n")
