@@ -4,12 +4,22 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/api"
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
 )
+
+const LABEL_AZURE_INSTANCE_TYPE = "node.kubernetes.io/instance-type"
+const LABEL_AZURE_REGION = "topology.kubernetes.io/region"
+const LABEL_OPERATING_SYSTEM = "kubernetes.io/os"
+const LABEL_OPERATING_SYSTEM_LINUX = "Linux"
+const LABEL_OPERATING_SYSTEM_WINDOWS = "Windows"
+
+const METER_SPOT = "Spot"
+const METER_LOW_PRIORITY = "Low Priority"
 
 func main() {
 	/*
@@ -65,27 +75,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	/*
-	 * Creates an Azure retail price API and queries it for resources with the specified filters.
-	 * Returns a QueryResponse type consisting of the response from the API.
-	 */
-	fmt.Printf("Data from Azure retails API:\n\n")
-
-	azureApi := NewApi()
-	response, err := azureApi.Query(QueryFilter{
-		armSkuName:    "Standard_D2as_v4",
-		armRegionName: "westeurope",
-		currencyCode:  SEK,
-		priceType:     "consumption",
-	})
-
-	if err != nil {
-		fmt.Printf("An error occured while querying the Azure retail price API: %v\n", err)
-		os.Exit(1)
-	}
-
-	printAzurePrices(response)
-
 	fmt.Printf("Data from Kubernetes API:\n\n")
 
 	clientSet, err := createClientSet()
@@ -105,13 +94,49 @@ func main() {
 	for _, node := range nodes {
 		fmt.Printf("Node name: %s\n", node.Name)
 		labels := node.Labels
+		azureInstanceType := labels[LABEL_AZURE_INSTANCE_TYPE]
+		azureRegion := labels[LABEL_AZURE_REGION]
+		operatingSystem := labels[LABEL_OPERATING_SYSTEM]
 
 		for key, value := range labels {
 			fmt.Printf("\tLabel name: %s, value: %s\n", key, value)
 		}
 
+		/*
+		 * Creates an Azure retail price API and queries it for resources with the specified filters.
+		 * Returns a QueryResponse type consisting of the response from the API.
+		 */
+		azureApi := NewApi()
+		response, err := azureApi.Query(QueryFilter{
+			armSkuName:    azureInstanceType,
+			armRegionName: azureRegion,
+			currencyCode:  SEK,
+			priceType:     "consumption",
+		})
+
+		if err != nil {
+			fmt.Printf("An error occured while querying the Azure retail price API: %v\n", err)
+			os.Exit(1)
+		}
+
+		// Find price per unit of time for the Azure nodes in the Kubernetes cluster
+		for _, item := range response.Items {
+			if !strings.Contains(item.MeterName, METER_SPOT) && !strings.Contains(item.MeterName, METER_LOW_PRIORITY) {
+				if strings.ToLower(operatingSystem) == strings.ToLower(LABEL_OPERATING_SYSTEM_LINUX) {
+					if !strings.Contains(item.ProductName, LABEL_OPERATING_SYSTEM_WINDOWS) {
+						fmt.Printf("\tPrice: %f, unit of measure: %s\n", item.RetailPrice, item.UnitOfMeasure)
+					}
+				} else if strings.ToLower(operatingSystem) == strings.ToLower(LABEL_OPERATING_SYSTEM_WINDOWS) {
+					if strings.Contains(item.ProductName, LABEL_OPERATING_SYSTEM_WINDOWS) {
+						fmt.Printf("\tPrice: %f, unit of measure: %s\n", item.RetailPrice, item.UnitOfMeasure)
+					}
+				}
+			}
+		}
+
 		fmt.Printf("\n")
 	}
+
 }
 
 func printVector(v model.Vector) {
