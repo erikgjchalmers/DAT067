@@ -4,22 +4,15 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/api"
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
+
+	"dat067/costestimation/kubernetes"
+	"dat067/costestimation/kubernetes/azure"
 )
-
-const LABEL_AZURE_INSTANCE_TYPE = "node.kubernetes.io/instance-type"
-const LABEL_AZURE_REGION = "topology.kubernetes.io/region"
-const LABEL_OPERATING_SYSTEM = "kubernetes.io/os"
-const LABEL_OPERATING_SYSTEM_LINUX = "Linux"
-const LABEL_OPERATING_SYSTEM_WINDOWS = "Windows"
-
-const METER_SPOT = "Spot"
-const METER_LOW_PRIORITY = "Low Priority"
 
 func main() {
 	/*
@@ -77,66 +70,19 @@ func main() {
 
 	fmt.Printf("Data from Kubernetes API:\n\n")
 
-	clientSet, err := createClientSet()
+	clientSet, err := kubernetes.CreateClientSet()
 
 	if err != nil {
-		fmt.Printf("An error occured while creating the Kubernetes clientSet: %v", err)
-		os.Exit(1)
+		fmt.Printf("An error occured when creating the Kubernetes client: '%v'", err)
 	}
 
-	nodes, err := getNodes(clientSet)
+	pricedNodes, err := azure.GetPricedAzureNodes(clientSet)
 
 	if err != nil {
-		fmt.Printf("An error occured while retrieving the nodes from Kubernetes: %v", err)
-		os.Exit(1)
+		fmt.Printf("An error occured while retrieving Azure node prices: '%v'", err)
 	}
 
-	for _, node := range nodes {
-		fmt.Printf("Node name: %s\n", node.Name)
-		labels := node.Labels
-		azureInstanceType := labels[LABEL_AZURE_INSTANCE_TYPE]
-		azureRegion := labels[LABEL_AZURE_REGION]
-		operatingSystem := labels[LABEL_OPERATING_SYSTEM]
-
-		for key, value := range labels {
-			fmt.Printf("\tLabel name: %s, value: %s\n", key, value)
-		}
-
-		/*
-		 * Creates an Azure retail price API and queries it for resources with the specified filters.
-		 * Returns a QueryResponse type consisting of the response from the API.
-		 */
-		azureApi := NewApi()
-		response, err := azureApi.Query(QueryFilter{
-			armSkuName:    azureInstanceType,
-			armRegionName: azureRegion,
-			currencyCode:  SEK,
-			priceType:     "consumption",
-		})
-
-		if err != nil {
-			fmt.Printf("An error occured while querying the Azure retail price API: %v\n", err)
-			os.Exit(1)
-		}
-
-		// Find price per unit of time for the Azure nodes in the Kubernetes cluster
-		for _, item := range response.Items {
-			if !strings.Contains(item.MeterName, METER_SPOT) && !strings.Contains(item.MeterName, METER_LOW_PRIORITY) {
-				if strings.ToLower(operatingSystem) == strings.ToLower(LABEL_OPERATING_SYSTEM_LINUX) {
-					if !strings.Contains(item.ProductName, LABEL_OPERATING_SYSTEM_WINDOWS) {
-						fmt.Printf("\tPrice: %f, unit of measure: %s\n", item.RetailPrice, item.UnitOfMeasure)
-					}
-				} else if strings.ToLower(operatingSystem) == strings.ToLower(LABEL_OPERATING_SYSTEM_WINDOWS) {
-					if strings.Contains(item.ProductName, LABEL_OPERATING_SYSTEM_WINDOWS) {
-						fmt.Printf("\tPrice: %f, unit of measure: %s\n", item.RetailPrice, item.UnitOfMeasure)
-					}
-				}
-			}
-		}
-
-		fmt.Printf("\n")
-	}
-
+	azure.PrintNodes(pricedNodes)
 }
 
 func printVector(v model.Vector) {
@@ -174,34 +120,4 @@ func printScalar(s model.Scalar) {
 
 func printString(s model.String) {
 	fmt.Printf("Time stamp: %v, value: %v\n", s.Timestamp, s.Value)
-}
-
-func printAzurePrices(r QueryResponse) {
-	fmt.Printf("Currency: %s, customer entity id: %s, customer entity type: %s\n", r.BillingCurrency, r.CustomerEntityId, r.CustomerEntityType)
-
-	for _, item := range r.Items {
-		fmt.Printf("\tarmRegionName: %s\n", item.ArmRegionName)
-		fmt.Printf("\tarmSkuName: %s\n", item.ArmSkuName)
-		fmt.Printf("\tcurrencyCode: %s\n", item.CurrencyCode)
-		fmt.Printf("\teffectiveStartDate: %s\n", item.EffectiveStartDate)
-		fmt.Printf("\tisPrimaryMeterRegion: %v\n", item.IsPrimaryMeterRegion)
-		fmt.Printf("\ttype: %s\n", item.ItemType)
-		fmt.Printf("\tlocation: %s\n", item.Location)
-		fmt.Printf("\tmeterId: %s\n", item.MeterId)
-		fmt.Printf("\tmeterName: %s\n", item.MeterName)
-		fmt.Printf("\tproductId: %s\n", item.ProductId)
-		fmt.Printf("\tproductName: %s\n", item.ProductName)
-		fmt.Printf("\tretailPrice: %f\n", item.RetailPrice)
-		fmt.Printf("\tserviceFamily: %s\n", item.ServiceFamily)
-		fmt.Printf("\tserviceId: %s\n", item.ServiceId)
-		fmt.Printf("\tserviceName: %s\n", item.ServiceName)
-		fmt.Printf("\tskuId: %s\n", item.SkuId)
-		fmt.Printf("\tskuName: %s\n", item.SkuName)
-		fmt.Printf("\ttierMinimumUnits: %d\n", item.TierMinimumUnits)
-		fmt.Printf("\tunitOfMeasure: %s\n", item.UnitOfMeasure)
-		fmt.Printf("\tunitPrice: %f\n", item.UnitPrice)
-		fmt.Printf("\n")
-	}
-
-	fmt.Printf("\n")
 }

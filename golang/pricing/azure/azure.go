@@ -1,4 +1,4 @@
-package main
+package azure
 
 import (
 	"encoding/json"
@@ -9,9 +9,14 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	priceTypes "dat067/costestimation/pricing/types"
 )
 
 const AZURE_HOST = "https://prices.azure.com/api/retail/prices"
+
+const METER_SPOT = "Spot"
+const METER_LOW_PRIORITY = "Low Priority"
 
 type Item struct {
 	CurrencyCode         string    `json:"currencyCode"`
@@ -105,25 +110,25 @@ func (c Currency) String() (string, error) {
 }
 
 type QueryFilter struct {
-	armRegionName string
-	location      string
-	meterId       string
-	productId     string
-	skuId         string
-	productName   string
-	skuName       string
-	serviceName   string
-	serviceId     string
-	serviceFamily string
-	priceType     string
-	armSkuName    string
-	currencyCode  Currency
+	ArmRegionName string
+	Location      string
+	MeterId       string
+	ProductId     string
+	SkuId         string
+	ProductName   string
+	SkuName       string
+	ServiceName   string
+	ServiceId     string
+	ServiceFamily string
+	PriceType     string
+	ArmSkuName    string
+	CurrencyCode  Currency
 }
 
 func (q *QueryFilter) String() (string, error) {
 	builder := strings.Builder{}
 
-	currency, err := q.currencyCode.String()
+	currency, err := q.CurrencyCode.String()
 	if err != nil {
 		return "", err
 	}
@@ -132,41 +137,41 @@ func (q *QueryFilter) String() (string, error) {
 
 	params.Add("currencyCode", currency)
 
-	if q.armRegionName != "" {
-		builder.WriteString(fmt.Sprintf("armRegionName eq '%s' and ", q.armRegionName))
+	if q.ArmRegionName != "" {
+		builder.WriteString(fmt.Sprintf("armRegionName eq '%s' and ", q.ArmRegionName))
 	}
-	if q.armSkuName != "" {
-		builder.WriteString(fmt.Sprintf("armSkuName eq '%s' and ", q.armSkuName))
+	if q.ArmSkuName != "" {
+		builder.WriteString(fmt.Sprintf("armSkuName eq '%s' and ", q.ArmSkuName))
 	}
-	if q.location != "" {
-		builder.WriteString(fmt.Sprintf("location eq '%s' and ", q.location))
+	if q.Location != "" {
+		builder.WriteString(fmt.Sprintf("location eq '%s' and ", q.Location))
 	}
-	if q.meterId != "" {
-		builder.WriteString(fmt.Sprintf("meterId eq '%s' and ", q.meterId))
+	if q.MeterId != "" {
+		builder.WriteString(fmt.Sprintf("meterId eq '%s' and ", q.MeterId))
 	}
-	if q.priceType != "" {
-		builder.WriteString(fmt.Sprintf("priceType eq '%s' and ", q.priceType))
+	if q.PriceType != "" {
+		builder.WriteString(fmt.Sprintf("priceType eq '%s' and ", q.PriceType))
 	}
-	if q.productId != "" {
-		builder.WriteString(fmt.Sprintf("productId eq '%s' and ", q.productId))
+	if q.ProductId != "" {
+		builder.WriteString(fmt.Sprintf("productId eq '%s' and ", q.ProductId))
 	}
-	if q.productName != "" {
-		builder.WriteString(fmt.Sprintf("productName eq '%s' and ", q.productName))
+	if q.ProductName != "" {
+		builder.WriteString(fmt.Sprintf("productName eq '%s' and ", q.ProductName))
 	}
-	if q.serviceFamily != "" {
-		builder.WriteString(fmt.Sprintf("serviceFamily eq '%s' and ", q.serviceFamily))
+	if q.ServiceFamily != "" {
+		builder.WriteString(fmt.Sprintf("serviceFamily eq '%s' and ", q.ServiceFamily))
 	}
-	if q.serviceId != "" {
-		builder.WriteString(fmt.Sprintf("serviceId eq '%s' and ", q.serviceId))
+	if q.ServiceId != "" {
+		builder.WriteString(fmt.Sprintf("serviceId eq '%s' and ", q.ServiceId))
 	}
-	if q.serviceName != "" {
-		builder.WriteString(fmt.Sprintf("serviceName eq '%s' and ", q.serviceName))
+	if q.ServiceName != "" {
+		builder.WriteString(fmt.Sprintf("serviceName eq '%s' and ", q.ServiceName))
 	}
-	if q.skuId != "" {
-		builder.WriteString(fmt.Sprintf("skuId eq '%s' and ", q.skuId))
+	if q.SkuId != "" {
+		builder.WriteString(fmt.Sprintf("skuId eq '%s' and ", q.SkuId))
 	}
-	if q.skuName != "" {
-		builder.WriteString(fmt.Sprintf("skuName eq '%s'", q.skuName))
+	if q.SkuName != "" {
+		builder.WriteString(fmt.Sprintf("skuName eq '%s'", q.SkuName))
 	}
 
 	finalFilterString := builder.String()
@@ -221,4 +226,53 @@ func (a *AzureCostApi) Query(q QueryFilter) (QueryResponse, error) {
 
 func NewApi() CostApi {
 	return &AzureCostApi{}
+}
+
+func ParseUnit(s string) (priceTypes.Unit, error) {
+	trimmedString := strings.ToLower(strings.ReplaceAll(s, " ", ""))
+
+	if trimmedString == "" {
+		return priceTypes.Unknown, errors.New(fmt.Sprintf("Invalid input value: '%s'", s))
+	}
+
+	switch trimmedString {
+	case "1hour":
+		return priceTypes.OneHour, nil
+	case "1minute":
+		return priceTypes.OneMinute, nil
+	case "1second":
+		return priceTypes.OneSecond, nil
+	}
+
+	return priceTypes.Unknown, errors.New(fmt.Sprintf("Invalid input value: '%s'", s))
+}
+
+func printPrices(r QueryResponse) {
+	fmt.Printf("Currency: %s, customer entity id: %s, customer entity type: %s\n", r.BillingCurrency, r.CustomerEntityId, r.CustomerEntityType)
+
+	for _, item := range r.Items {
+		fmt.Printf("\tarmRegionName: %s\n", item.ArmRegionName)
+		fmt.Printf("\tarmSkuName: %s\n", item.ArmSkuName)
+		fmt.Printf("\tcurrencyCode: %s\n", item.CurrencyCode)
+		fmt.Printf("\teffectiveStartDate: %s\n", item.EffectiveStartDate)
+		fmt.Printf("\tisPrimaryMeterRegion: %v\n", item.IsPrimaryMeterRegion)
+		fmt.Printf("\ttype: %s\n", item.ItemType)
+		fmt.Printf("\tlocation: %s\n", item.Location)
+		fmt.Printf("\tmeterId: %s\n", item.MeterId)
+		fmt.Printf("\tmeterName: %s\n", item.MeterName)
+		fmt.Printf("\tproductId: %s\n", item.ProductId)
+		fmt.Printf("\tproductName: %s\n", item.ProductName)
+		fmt.Printf("\tretailPrice: %f\n", item.RetailPrice)
+		fmt.Printf("\tserviceFamily: %s\n", item.ServiceFamily)
+		fmt.Printf("\tserviceId: %s\n", item.ServiceId)
+		fmt.Printf("\tserviceName: %s\n", item.ServiceName)
+		fmt.Printf("\tskuId: %s\n", item.SkuId)
+		fmt.Printf("\tskuName: %s\n", item.SkuName)
+		fmt.Printf("\ttierMinimumUnits: %d\n", item.TierMinimumUnits)
+		fmt.Printf("\tunitOfMeasure: %s\n", item.UnitOfMeasure)
+		fmt.Printf("\tunitPrice: %f\n", item.UnitPrice)
+		fmt.Printf("\n")
+	}
+
+	fmt.Printf("\n")
 }
