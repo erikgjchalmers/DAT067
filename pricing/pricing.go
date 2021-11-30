@@ -1,4 +1,4 @@
-package azure
+package pricing
 
 import (
 	"encoding/json"
@@ -9,8 +9,6 @@ import (
 	"net/url"
 	"strings"
 	"time"
-
-	priceTypes "dat067/costestimation/pricing/types"
 )
 
 const AZURE_HOST = "https://prices.azure.com/api/retail/prices"
@@ -228,23 +226,23 @@ func NewApi() CostApi {
 	return &AzureCostApi{}
 }
 
-func ParseUnit(s string) (priceTypes.Unit, error) {
+func ParseUnit(s string) (Unit, error) {
 	trimmedString := strings.ToLower(strings.ReplaceAll(s, " ", ""))
 
 	if trimmedString == "" {
-		return priceTypes.Unknown, errors.New(fmt.Sprintf("Invalid input value: '%s'", s))
+		return Unknown, errors.New(fmt.Sprintf("Invalid input value: '%s'", s))
 	}
 
 	switch trimmedString {
 	case "1hour":
-		return priceTypes.OneHour, nil
+		return OneHour, nil
 	case "1minute":
-		return priceTypes.OneMinute, nil
+		return OneMinute, nil
 	case "1second":
-		return priceTypes.OneSecond, nil
+		return OneSecond, nil
 	}
 
-	return priceTypes.Unknown, errors.New(fmt.Sprintf("Invalid input value: '%s'", s))
+	return Unknown, errors.New(fmt.Sprintf("Invalid input value: '%s'", s))
 }
 
 func printPrices(r QueryResponse) {
@@ -275,4 +273,38 @@ func printPrices(r QueryResponse) {
 	}
 
 	fmt.Printf("\n")
+}
+
+// Author: Erik Wahlberger
+// Type to represent the unit of measure for prices
+type Unit uint
+
+// Author: Erik Wahlberger
+// Enum for Unit type, containing the possible values to choose from (enum)
+const (
+	Unknown Unit = iota
+	OneHour
+	OneMinute
+	OneSecond
+)
+
+// Author: Erik Wahlberger
+// Returns a string representation for the Unit value, or an empty string if an invalid value was provided
+func (u Unit) String() string {
+	switch u {
+	case OneHour:
+		return "1 Hour"
+	case OneMinute:
+		return "1 Minute"
+	case OneSecond:
+		return "1 Second"
+	}
+
+	return ""
+}
+
+// Author: Erik Wahlberger
+type CloudProviderPrice struct {
+	Price float64
+	Unit  Unit
 }
