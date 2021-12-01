@@ -45,6 +45,16 @@ func GetCPUNodeCapacity(node string) (float64, promv1.Warnings, error) {
 	return value, warnings, err
 }
 
+func GetMemoryNodeCapacity(node string) (float64, promv1.Warnings, error) {
+	strBuilder := fmt.Sprintf("kube_node_status_capacity{resource='memory', node='%s'}", node)
+	result, warnings, err := Query(strBuilder, localAPI)
+	vector := result.(model.Vector)
+	sample := vector[0]
+	valueField := sample.Value
+	value := float64(valueField)
+	return value, warnings, err
+}
+
 func GetCPUNodeUsage(node string) (float64, promv1.Warnings, error) {
 	return getResourceUsageQuery("cpu", node)
 }

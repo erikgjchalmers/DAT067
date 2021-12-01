@@ -12,6 +12,12 @@ import (
 	"github.com/prometheus/common/model"
 )
 
+// [price/hour] * hour
+
+func calculateCost(nodeMemoryCapacity float64, nodeCPUCapacity float64, nodeMemoryUsage float64, nodeCPUUsage float64, nodePrice float64, hours float64) float64 {
+	return nodePrice * hours * (nodeMemoryUsage * nodeCPUUsage) / (nodeMemoryCapacity * nodeCPUCapacity)
+}
+
 func main() {
 	/*
 	 * The following code queries Prometheus on localhost using the simple "up" query.
@@ -20,10 +26,16 @@ func main() {
 	//query := "up"
 
 	prometheus.CreateAPI(address)
-	result, warnings, err := prometheus.GetMemoryNodeUsage("aks-standard1-15038067-vmss000001")
+	memCapacity, warnings, err := prometheus.GetMemoryNodeCapacity("aks-standard1-15038067-vmss000001")
+	memUsage, warnings, err := prometheus.GetMemoryNodeUsage("aks-standard1-15038067-vmss000001")
+	cpuCapacity, warnings, err := prometheus.GetCPUNodeCapacity("aks-standard1-15038067-vmss000001")
+	cpuUsage, warnings, err := prometheus.GetCPUNodeUsage("aks-standard1-15038067-vmss000001")
+
+	price := calculateCost(memCapacity, cpuCapacity, memUsage, cpuUsage, 10, 1)
+	fmt.Printf("Your node costs %f dollars.\n", price)
 
 	//result, warnings, err := prometheus.Query(query, api)
-	fmt.Println("WOPDIDOO:", result)
+	//fmt.Println("WOPDIDOO:", result)
 
 	if err != nil {
 		fmt.Printf("An error occured when querying Prometheus: %v\n", err)
