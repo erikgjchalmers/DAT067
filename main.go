@@ -7,6 +7,7 @@ import (
 	"dat067/costestimation/kubernetes"
 	"dat067/costestimation/kubernetes/azure"
 	"dat067/costestimation/prometheus"
+
 	//model shouldn't be needed after test printing functionality removed.
 	"github.com/prometheus/common/model"
 )
@@ -16,11 +17,13 @@ func main() {
 	 * The following code queries Prometheus on localhost using the simple "up" query.
 	 */
 	address := "http://localhost:9090"
-	query := "up"
+	//query := "up"
 
-	api := prometheus.CreateAPI(address)
+	prometheus.CreateAPI(address)
+	result, warnings, err := prometheus.GetCPUNodeCapacity("aks-standard1-15038067-vmss000001")
 
-	result, warnings, err := prometheus.Query(query, api)
+	//result, warnings, err := prometheus.Query(query, api)
+	fmt.Println("WOPDIDOO:", result)
 
 	if err != nil {
 		fmt.Printf("An error occured when querying Prometheus: %v\n", err)
@@ -33,27 +36,31 @@ func main() {
 
 	fmt.Printf("Data from Prometheus:\n\n")
 
-	switch result.Type() {
-	case model.ValVector:
-		vector := result.(model.Vector)
-		printVector(vector)
-		break
-	case model.ValMatrix:
-		matrix := result.(model.Matrix)
-		printMatrix(matrix)
-		break
-	case model.ValScalar:
-		scalar := result.(*model.Scalar)
-		printScalar(*scalar)
-		break
-	case model.ValString:
-		str := result.(*model.String)
-		printString(*str)
-		break
-	case model.ValNone:
-		fmt.Printf("Error: No compatible value type defined for the query result: %v\n", result)
-		os.Exit(1)
-	}
+	/* 	switch result.Type() {
+	   	case model.ValVector:
+	   		vector := result.(model.Vector)
+	   		printVector(vector)
+	   		fmt.Printf("Valvector")
+	   		break
+	   	case model.ValMatrix:
+	   		matrix := result.(model.Matrix)
+	   		printMatrix(matrix)
+	   		fmt.Printf("ValMatrix")
+	   		break
+	   	case model.ValScalar:
+	   		scalar := result.(*model.Scalar)
+	   		printScalar(*scalar)
+	   		fmt.Printf("ValScalar")
+	   		break
+	   	case model.ValString:
+	   		str := result.(*model.String)
+	   		printString(*str)
+	   		fmt.Printf("ValString")
+	   		break
+	   	case model.ValNone:
+	   		fmt.Printf("Error: No compatible value type defined for the query result: %v\n", result)
+	   		os.Exit(1)
+	   	} */
 
 	fmt.Printf("Data from Kubernetes API:\n\n")
 
