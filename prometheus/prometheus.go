@@ -45,6 +45,24 @@ func GetCPUNodeCapacity(node string) (float64, promv1.Warnings, error) {
 	return value, warnings, err
 }
 
+func GetCPUNodeUsage(node string) (float64, promv1.Warnings, error) {
+	return getResourceUsageQuery("cpu", node)
+}
+
+func GetMemoryNodeUsage(node string) (float64, promv1.Warnings, error) {
+	return getResourceUsageQuery("memory", node)
+}
+
+func getResourceUsageQuery(resource string, node string) (float64, promv1.Warnings, error) {
+	resourceUsageQuery := fmt.Sprintf("kube_node_status_capacity{resource='%s', node='%s'} - avg_over_time(kube_node_status_allocatable{resource='%s', node='%s'}[1h])", resource, node, resource, node)
+	result, warnings, err := Query(resourceUsageQuery, localAPI)
+	vector := result.(model.Vector)
+	sample := vector[0]
+	valueField := sample.Value
+	value := float64(valueField)
+	return value, warnings, err
+}
+
 type prometheusInterface interface {
 	GetCPUNodeCapacity(node string) (float64, promv1.Warnings, error)
 }

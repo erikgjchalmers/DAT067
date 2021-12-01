@@ -20,7 +20,7 @@ func main() {
 	//query := "up"
 
 	prometheus.CreateAPI(address)
-	result, warnings, err := prometheus.GetCPUNodeCapacity("aks-standard1-15038067-vmss000001")
+	result, warnings, err := prometheus.GetMemoryNodeUsage("aks-standard1-15038067-vmss000001")
 
 	//result, warnings, err := prometheus.Query(query, api)
 	fmt.Println("WOPDIDOO:", result)
