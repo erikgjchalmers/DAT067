@@ -46,34 +46,24 @@ func GetPricedAzureNodes(c *kubernetes.Clientset) ([]kubeHelper.PricedNode, erro
 			if !strings.Contains(item.MeterName, pricing.METER_SPOT) && !strings.Contains(item.MeterName, pricing.METER_LOW_PRIORITY) {
 				if strings.ToLower(operatingSystem) == strings.ToLower(kubeHelper.LABEL_OPERATING_SYSTEM_LINUX) {
 					if !strings.Contains(item.ProductName, kubeHelper.LABEL_OPERATING_SYSTEM_WINDOWS) {
-						unit, err := pricing.ParseUnit(item.UnitOfMeasure)
-
 						if err != nil {
 							return nil, errors.New(fmt.Sprintf("Invalid unit of measure returned by Azure Retail Prices API: '%s'", item.UnitOfMeasure))
 						}
 
 						pricedNodes = append(pricedNodes, kubeHelper.PricedNode{
-							Node: node,
-							Price: pricing.CloudProviderPrice{
-								Price: item.UnitPrice,
-								Unit:  unit,
-							},
+							Node:  node,
+							Price: item.UnitPrice,
 						})
 					}
 				} else if strings.ToLower(operatingSystem) == strings.ToLower(kubeHelper.LABEL_OPERATING_SYSTEM_WINDOWS) {
 					if strings.Contains(item.ProductName, kubeHelper.LABEL_OPERATING_SYSTEM_WINDOWS) {
-						unit, err := pricing.ParseUnit(item.UnitOfMeasure)
-
 						if err != nil {
 							return nil, errors.New(fmt.Sprintf("Invalid unit of measure returned by Azure Retail Prices API: '%s'", item.UnitOfMeasure))
 						}
 
 						pricedNodes = append(pricedNodes, kubeHelper.PricedNode{
-							Node: node,
-							Price: pricing.CloudProviderPrice{
-								Price: item.UnitPrice,
-								Unit:  unit,
-							},
+							Node:  node,
+							Price: item.UnitPrice,
 						})
 
 					}
@@ -87,6 +77,6 @@ func GetPricedAzureNodes(c *kubernetes.Clientset) ([]kubeHelper.PricedNode, erro
 
 func PrintNodes(nodes []kubeHelper.PricedNode) {
 	for _, node := range nodes {
-		fmt.Printf("Node hostname: %s, node price: %f, node price unit of measure: %s\n", node.Node.Name, node.Price.Price, node.Price.Unit.String())
+		fmt.Printf("Node hostname: %s, node price per hour: %f\n", node.Node.Name, node.Price)
 	}
 }
