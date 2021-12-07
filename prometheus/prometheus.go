@@ -15,6 +15,10 @@ import (
 
 var localAPI promv1.API
 
+func ImportantFunction() int {
+	return 3
+}
+
 func CreateAPI(address string) promv1.API {
 	client, err := api.NewClient(api.Config{
 		Address: address,
