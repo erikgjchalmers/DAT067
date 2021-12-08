@@ -34,7 +34,7 @@ kind: CronJob
 metadata:
   name: curl-resource-consumer
 spec:
-  schedule: "*/2 * * * *"
+  schedule: "*/5 * * * *"
   concurrencyPolicy: Replace
   successfulJobsHistoryLimit: 1
   failedJobsHistoryLimit: 1
@@ -48,13 +48,13 @@ spec:
             imagePullPolicy: IfNotPresent
             args:
               - -d
-              - "millicores=300&durationSec=700"
+              - "millicores=300&durationSec=120"
               - http://resource-consumer.consumer:8080/ConsumeCPU
           - name: curl-mem
             image: curlimages/curl
             imagePullPolicy: IfNotPresent
             args:
               - -d
-              - "megabytes=256&durationSec=700"
+              - "megabytes=256&durationSec=120"
               - http://resource-consumer.consumer:8080/ConsumeMem
           restartPolicy: OnFailure
