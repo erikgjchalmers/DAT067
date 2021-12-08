@@ -1,7 +1,5 @@
 package models
 
-import "fmt"
-
 // [price/hour] * hour
 type ICostCalculator interface {
 	CalculateCost(
@@ -48,20 +46,22 @@ func (m GoodModel) CalculateCost(nodeResources []float64, usagePerContainer [][]
 	}
 	//Maybe a check here is needed to make sure that wasted resources are not negative? In case of over 100% use of resources.
 
-	//Generate a vector for distributing waste cost
-	propOfWastedCost := make([]float64, len(nodeResources))
+	//Generate the actual cost of wasted resources
 	var wastedCost float64 = 0
+	for i, v := range wastedResources {
+		wastedCost += v * nodePrice * m.balance[i]
+	}
+	//Generate a vector for distributing wasted resource cost
+	propOfWastedCost := make([]float64, len(nodeResources))
 	for i := range propOfWastedCost {
 		propOfWastedCost[i] = 0
 		for j, v := range wastedResources {
-			wastedCost += nodePrice * v * m.balance[j]
 			if i == j {
 				continue
 			}
 			propOfWastedCost[i] += v
 		}
 	}
-	println(fmt.Sprintf("Wasted cost: %f", wastedCost))
 	propOfWastedCost = normalizeSlice(propOfWastedCost)
 	//Calculate costs
 	costs := make([]float64, len(nodeResources))
@@ -70,13 +70,9 @@ func (m GoodModel) CalculateCost(nodeResources []float64, usagePerContainer [][]
 		for j, costOfDimensionForContainer := range con {
 			//The cost for the resources used and also the cost for the wasted resources.
 			//TODO: Doublecheck this.
-			sumOfCostsForContainer += nodePrice*m.balance[j]*costOfDimensionForContainer + propOfWastedCost[j]*m.balance[j]*wastedCost*(con[j]/totalUseOfResource[j])
-			println(fmt.Sprintf("Wasted cost for dimension %d was %f", j, propOfWastedCost[j]*m.balance[j]*wastedCost*(con[j]/totalUseOfResource[j])))
+			sumOfCostsForContainer += nodePrice*m.balance[j]*costOfDimensionForContainer + propOfWastedCost[j]*wastedCost*(con[j]/totalUseOfResource[j])
 		}
 		costs[i] = sumOfCostsForContainer
-	}
-	if len(costs) == 3 {
-		println(fmt.Sprintf("prices were %f, %f and %f", costs[0], costs[1], costs[2]))
 	}
 	return costs
 }
