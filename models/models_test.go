@@ -40,4 +40,7 @@ func TestGoodModel(t *testing.T) {
 	m := GoodModel{[]float64{1}}
 	var prices []float64 = m.CalculateCost([]float64{1}, [][]float64{{1}}, 100, 1)
 	assert.InDelta(t, 100, prices[0], epsilon)
+
+	prices = m.CalculateCost([]float64{1}, [][]float64{{.5}}, 100, 1)
+	assert.InDelta(t, 100, prices[0], epsilon)
 }
