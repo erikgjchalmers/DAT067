@@ -43,14 +43,27 @@ func (m GoodModel) CalculateCost(nodeResources []float64, usagePerContainer [][]
 		}
 		wastedResources[i] = 1 - totalUseOfResource
 	}
-	println(wastedResources)
+	//Maybe a check here is needed to make sure that wasted resources are not negative? In case of over 100% use of resources.
 
+	//Generate a vector for distributing waste cost
+	propOfWastedCost := make([]float64, len(nodeResources))
+	for i := range propOfWastedCost {
+		propOfWastedCost[i] = 0
+		for j, v := range wastedResources {
+			if i == j {
+				continue
+			}
+			propOfWastedCost[i] += v
+		}
+	}
+	propOfWastedCost = normalizeSlice(propOfWastedCost)
 	//Calculate costs
 	costs := make([]float64, len(nodeResources))
 	for i := range usagePerContainer {
 		var sumOfCostsForContainer float64 = 0
-		for _, costOfDimensionForContainer := range usagePerContainer[i] {
-			sumOfCostsForContainer += nodePrice * m.balance[i] * costOfDimensionForContainer
+		for j, costOfDimensionForContainer := range usagePerContainer[i] {
+			//The cost for the resources used and also the cost for the wasted resources.
+			sumOfCostsForContainer += nodePrice*m.balance[j]*costOfDimensionForContainer + propOfWastedCost[j]*m.balance[j]*wastedResources[j]*nodePrice
 		}
 		costs[i] = sumOfCostsForContainer
 	}
