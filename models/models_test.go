@@ -61,4 +61,20 @@ func TestGoodModel(t *testing.T) {
 		sum += v
 	}
 	assert.InDelta(t, randomPrice, sum, epsilon)
+
+	m.balance = []float64{1, 1, 1}
+	prices = m.CalculateCost([]float64{100, 100, 100}, [][]float64{{25, 50, 50}, {50, 50, 50}, {10, 0, 0}}, 100, 1)
+	sum = 0
+	for _, v := range prices {
+		sum += v
+	}
+	assert.InDelta(t, 100, sum, epsilon)
+
+	m.balance = []float64{2, 1, 1}
+	prices = m.CalculateCost([]float64{100, 100, 100}, [][]float64{{25, 50, 50}, {50, 50, 50}, {10, 0, 0}}, 100, 1)
+	sum = 0
+	for _, v := range prices {
+		sum += v
+	}
+	assert.InDelta(t, 100, sum, epsilon)
 }

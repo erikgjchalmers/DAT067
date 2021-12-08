@@ -1,5 +1,7 @@
 package models
 
+import "fmt"
+
 // [price/hour] * hour
 type ICostCalculator interface {
 	CalculateCost(
@@ -27,6 +29,7 @@ func (m GoodModel) CalculateCost(nodeResources []float64, usagePerContainer [][]
 	m.balance = normalizeSlice(m.balance)
 
 	//Converting the usage array to percentage.
+	//TODO: Currently changes the slice. Fix!
 	for i := range usagePerContainer {
 		for j, v := range usagePerContainer[i] {
 			usagePerContainer[i][j] = v / nodeResources[j]
@@ -34,38 +37,46 @@ func (m GoodModel) CalculateCost(nodeResources []float64, usagePerContainer [][]
 	}
 
 	wastedResources := make([]float64, len(nodeResources))
+	totalUseOfResource := make([]float64, len(nodeResources))
 	//For each resource
 	for i := range nodeResources {
-		totalUseOfResource := 0.0
 		//For each container
 		for j := range usagePerContainer {
-			totalUseOfResource += usagePerContainer[j][i]
+			totalUseOfResource[i] += usagePerContainer[j][i]
 		}
-		wastedResources[i] = 1 - totalUseOfResource
+		wastedResources[i] = 1 - totalUseOfResource[i]
 	}
 	//Maybe a check here is needed to make sure that wasted resources are not negative? In case of over 100% use of resources.
 
 	//Generate a vector for distributing waste cost
 	propOfWastedCost := make([]float64, len(nodeResources))
+	var wastedCost float64 = 0
 	for i := range propOfWastedCost {
 		propOfWastedCost[i] = 0
 		for j, v := range wastedResources {
+			wastedCost += nodePrice * v * m.balance[j]
 			if i == j {
 				continue
 			}
 			propOfWastedCost[i] += v
 		}
 	}
+	println(fmt.Sprintf("Wasted cost: %f", wastedCost))
 	propOfWastedCost = normalizeSlice(propOfWastedCost)
 	//Calculate costs
 	costs := make([]float64, len(nodeResources))
-	for i := range usagePerContainer {
+	for i, con := range usagePerContainer {
 		var sumOfCostsForContainer float64 = 0
-		for j, costOfDimensionForContainer := range usagePerContainer[i] {
+		for j, costOfDimensionForContainer := range con {
 			//The cost for the resources used and also the cost for the wasted resources.
-			sumOfCostsForContainer += nodePrice*m.balance[j]*costOfDimensionForContainer + propOfWastedCost[j]*m.balance[j]*wastedResources[j]*nodePrice
+			//TODO: Doublecheck this.
+			sumOfCostsForContainer += nodePrice*m.balance[j]*costOfDimensionForContainer + propOfWastedCost[j]*m.balance[j]*wastedCost*(con[j]/totalUseOfResource[j])
+			println(fmt.Sprintf("Wasted cost for dimension %d was %f", j, propOfWastedCost[j]*m.balance[j]*wastedCost*(con[j]/totalUseOfResource[j])))
 		}
 		costs[i] = sumOfCostsForContainer
+	}
+	if len(costs) == 3 {
+		println(fmt.Sprintf("prices were %f, %f and %f", costs[0], costs[1], costs[2]))
 	}
 	return costs
 }
