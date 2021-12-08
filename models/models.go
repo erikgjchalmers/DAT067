@@ -24,10 +24,10 @@ type GoodModel struct {
 func (m GoodModel) CalculateCost(nodeResources []float64, usagePerContainer [][]float64, nodePrice float64, hours float64) []float64 {
 	wastedResources := make([]float64, len(nodeResources))
 	//For each resource
-	for i, _ := range nodeResources {
+	for i := range nodeResources {
 		totalUseOfResource := 0.0
 		//For each container
-		for j, _ := range usagePerContainer {
+		for j := range usagePerContainer {
 			totalUseOfResource += usagePerContainer[j][i]
 		}
 		wastedResources[i] = nodeResources[i] - totalUseOfResource
@@ -44,7 +44,7 @@ func normalizeSlice(arr []float64) []float64 {
 	}
 	toReturn := make([]float64, len(arr))
 	if sum == 0 {
-		for i, _ := range arr {
+		for i := range arr {
 			toReturn[i] = 1.0 / float64(len(arr))
 		}
 		return toReturn
