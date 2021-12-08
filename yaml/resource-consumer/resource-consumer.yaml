@@ -1,0 +1,60 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: consumer
+spec:
+  selector:
+    name: resource-consumer
+  clusterIP: None
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: resource-consumer
+  labels:
+    name: resource-consumer
+spec:
+  hostname: resource-consumer
+  subdomain: consumer
+  containers:
+  - name: resource-consumer
+    image: gcr.io/k8s-staging-e2e-test-images/resource-consumer:1.9
+    ports:
+    - containerPort: 8080
+    resources:
+      requests:
+        cpu: 300m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: curl-resource-consumer
+spec:
+  schedule: "*/2 * * * *"
+  concurrencyPolicy: Replace
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: curl-cpu
+            image: curlimages/curl
+            imagePullPolicy: IfNotPresent
+            args:
+              - -d
+              - "millicores=300&durationSec=700"
+              - http://resource-consumer.consumer:8080/ConsumeCPU
+          - name: curl-mem
+            image: curlimages/curl
+            imagePullPolicy: IfNotPresent
+            args:
+              - -d
+              - "megabytes=256&durationSec=700"
+              - http://resource-consumer.consumer:8080/ConsumeMem
+          restartPolicy: OnFailure
