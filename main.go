@@ -6,20 +6,12 @@ import (
 
 	"dat067/costestimation/kubernetes"
 	"dat067/costestimation/kubernetes/azure"
+	"dat067/costestimation/models"
 	"dat067/costestimation/prometheus"
 
 	//model shouldn't be needed after test printing functionality removed.
 	"github.com/prometheus/common/model"
 )
-
-// [price/hour] * hour
-type IcostCalculator interface {
-	calculateCost(nodeMemoryCapacity, nodeCPUcapacity, nodeMemoryUsage, nodeCPUUsage, nodePrice, hours float64) float64
-}
-
-func calculateCost(nodeMemoryCapacity float64, nodeCPUCapacity float64, nodeMemoryUsage float64, nodeCPUUsage float64, nodePrice float64, hours float64) float64 {
-	return nodePrice * hours * (nodeMemoryUsage * nodeCPUUsage) / (nodeMemoryCapacity * nodeCPUCapacity)
-}
 
 func main() {
 	/*
@@ -33,8 +25,8 @@ func main() {
 	memUsage, warnings, err := prometheus.GetMemoryNodeUsage("aks-standard1-15038067-vmss000001")
 	cpuCapacity, warnings, err := prometheus.GetCPUNodeCapacity("aks-standard1-15038067-vmss000001")
 	cpuUsage, warnings, err := prometheus.GetCPUNodeUsage("aks-standard1-15038067-vmss000001")
-
-	price := calculateCost(memCapacity, cpuCapacity, memUsage, cpuUsage, 10, 1)
+	costmodel := models.GoodModel{}
+	price := costmodel.CalculateCost({memCapacity, cpuCapacity},[memUsage, cpuUsage], 10, 1)
 	fmt.Printf("Your node costs %f dollars.\n", price)
 
 	//result, warnings, err := prometheus.Query(query, api)
