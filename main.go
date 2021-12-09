@@ -25,9 +25,9 @@ func main() {
 	memUsage, warnings, err := prometheus.GetMemoryNodeUsage("aks-standard1-15038067-vmss000001")
 	cpuCapacity, warnings, err := prometheus.GetCPUNodeCapacity("aks-standard1-15038067-vmss000001")
 	cpuUsage, warnings, err := prometheus.GetCPUNodeUsage("aks-standard1-15038067-vmss000001")
-	costmodel := models.GoodModel{}
+	costmodel := models.GoodModel{Balance: []float64{2, 1}}
 	price := costmodel.CalculateCost([]float64{memCapacity, cpuCapacity}, [][]float64{{memUsage, cpuUsage}}, 10, 1)
-	fmt.Printf("Your node costs %f dollars.\n", price)
+	fmt.Printf("Your node costs %f dollars.\n", price[0])
 
 	//result, warnings, err := prometheus.Query(query, api)
 	//fmt.Println("WOPDIDOO:", result)

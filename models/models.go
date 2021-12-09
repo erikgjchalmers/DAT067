@@ -18,13 +18,16 @@ func (m BadModel) CalculateCost(capacity []float64, usage []float64, nodePrice f
 
 //Goodmodel
 type GoodModel struct {
-	balance []float64
+	Balance []float64
 }
 
 func (m GoodModel) CalculateCost(nodeResources []float64, usagePerContainer [][]float64, nodePrice float64, hours float64) []float64 {
 
-	//Make sure that balance is normalized(Is there a way to do this on model declaration?)
-	m.balance = normalizeSlice(m.balance)
+	//Make sure that Balance is normalized(Is there a way to do this on model declaration?)
+	if m.Balance == nil {
+		m.Balance = make([]float64, len(nodeResources))
+	}
+	m.Balance = normalizeSlice(m.Balance)
 
 	//Converting the usage array to percentage.
 	//TODO: Currently changes the slice. Fix!
@@ -49,7 +52,7 @@ func (m GoodModel) CalculateCost(nodeResources []float64, usagePerContainer [][]
 	//Generate the actual cost of wasted resources
 	var wastedCost float64 = 0
 	for i, v := range wastedResources {
-		wastedCost += v * nodePrice * m.balance[i]
+		wastedCost += v * nodePrice * m.Balance[i]
 	}
 	//Generate a vector for distributing wasted resource cost
 	propOfWastedCost := make([]float64, len(nodeResources))
@@ -70,7 +73,7 @@ func (m GoodModel) CalculateCost(nodeResources []float64, usagePerContainer [][]
 		for j, costOfDimensionForContainer := range con {
 			//The cost for the resources used and also the cost for the wasted resources.
 			//TODO: Doublecheck this.
-			sumOfCostsForContainer += nodePrice*m.balance[j]*costOfDimensionForContainer + propOfWastedCost[j]*wastedCost*(con[j]/totalUseOfResource[j])
+			sumOfCostsForContainer += nodePrice*m.Balance[j]*costOfDimensionForContainer + propOfWastedCost[j]*wastedCost*(con[j]/totalUseOfResource[j])
 		}
 		costs[i] = sumOfCostsForContainer
 	}
