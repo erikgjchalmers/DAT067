@@ -5,7 +5,6 @@ import (
 	"flag"
 	"path/filepath"
 
-	"dat067/costestimation/pricing"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -19,7 +18,7 @@ const LABEL_OPERATING_SYSTEM_WINDOWS = "Windows"
 
 type PricedNode struct {
 	Node  v1.Node
-	Price pricing.CloudProviderPrice
+	Price float64
 }
 
 func CreateClientSet() (*kubernetes.Clientset, error) {
