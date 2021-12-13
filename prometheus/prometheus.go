@@ -60,14 +60,14 @@ func GetMemoryNodeCapacity(node string) (float64, promv1.Warnings, error) {
 }
 
 func GetCPUNodeUsage(node string) (float64, promv1.Warnings, error) {
-	return getResourceUsageQuery("cpu", node)
+	return getNodeResourceUsageQuery("cpu", node)
 }
 
 func GetMemoryNodeUsage(node string) (float64, promv1.Warnings, error) {
-	return getResourceUsageQuery("memory", node)
+	return getNodeResourceUsageQuery("memory", node)
 }
 
-func getResourceUsageQuery(resource string, node string) (float64, promv1.Warnings, error) {
+func getNodeResourceUsageQuery(resource string, node string) (float64, promv1.Warnings, error) {
 	resourceUsageQuery := fmt.Sprintf("kube_node_status_capacity{resource='%s', node='%s'} - avg_over_time(kube_node_status_allocatable{resource='%s', node='%s'}[1h])", resource, node, resource, node)
 	result, warnings, err := Query(resourceUsageQuery, localAPI)
 	vector := result.(model.Vector)
@@ -75,6 +75,68 @@ func getResourceUsageQuery(resource string, node string) (float64, promv1.Warnin
 	valueField := sample.Value
 	value := float64(valueField)
 	return value, warnings, err
+}
+
+/*
+ * Author: Erik Wahlberger
+ * Retrieves a map of pod-CPU usage key-value pairs. CPU usage is given in the amount of CPU cores being used by each respective pod
+ */
+func GetPodsCPUUsage() (map[string]float64, promv1.Warnings, error) {
+	resourceUsageQuery := "sum(irate(container_cpu_usage_seconds_total{container!='POD', container!='', pod!=''}[5m])) by (pod, instance)"
+	result, warnings, err := Query(resourceUsageQuery, localAPI)
+	vector, ok := result.(model.Vector)
+
+	if !ok {
+		return nil, nil, fmt.Errorf("Pods CPU usage query did not return a Vector.")
+	}
+
+	if len(vector) == 0 {
+		return nil, nil, fmt.Errorf("Pods CPU usage query returned empty result.")
+	}
+
+	usageMap := make(map[string]float64)
+
+	for _, sample := range vector {
+		labelSet := model.LabelSet(sample.Metric)
+		pod := string(labelSet["pod"])
+		node := string(labelSet["instance"])
+
+		fmt.Printf("Pod %s is running on node %s and is currently using %.6f cores of CPU.\n", pod, node, float64(sample.Value))
+		usageMap[pod] = float64(sample.Value)
+	}
+
+	return usageMap, warnings, err
+}
+
+/*
+ * Author: Erik Wahlberger
+ * Retrieves a map of pod-RAM usage key-value pairs. RAM usage is given in bytes being used by each respective pod
+ */
+func GetPodsMemoryUsage() (map[string]float64, promv1.Warnings, error) {
+	resourceUsageQuery := "sum(container_memory_usage_bytes{pod != ''}) by (instance, pod)"
+	result, warnings, err := Query(resourceUsageQuery, localAPI)
+	vector, ok := result.(model.Vector)
+
+	if !ok {
+		return nil, nil, fmt.Errorf("Pods memory usage query did not return a Vector.")
+	}
+
+	if len(vector) == 0 {
+		return nil, nil, fmt.Errorf("Pods Memory usage query returned empty result.")
+	}
+
+	usageMap := make(map[string]float64)
+
+	for _, sample := range vector {
+		labelSet := model.LabelSet(sample.Metric)
+		pod := string(labelSet["pod"])
+		node := string(labelSet["instance"])
+
+		fmt.Printf("Pod %s is running on node %s and is currently using %.1f bytes of RAM.\n", pod, node, float64(sample.Value))
+		usageMap[pod] = float64(sample.Value)
+	}
+
+	return usageMap, warnings, err
 }
 
 type prometheusInterface interface {

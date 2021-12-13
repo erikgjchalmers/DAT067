@@ -84,6 +84,10 @@ func main() {
 	}
 
 	azure.PrintNodes(pricedNodes)
+	prometheus.GetPodsCPUUsage()
+	fmt.Println()
+	fmt.Println()
+	prometheus.GetPodsMemoryUsage()
 }
 
 func printVector(v model.Vector) {
