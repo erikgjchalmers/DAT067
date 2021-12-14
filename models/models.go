@@ -83,8 +83,8 @@ func (m GoodModel) CalculateCost(nodeResources []float64, usagePerContainer [][]
 			sumOfBaseCostForContainer += nodePrice * m.Balance[j] * costOfDimensionForContainer
 			sumOfWasteForContainer += propOfWastedCost[j] * wastedCost * (con[j] / totalUseOfResource[j])
 		}
-		costs[i] = sumOfBaseCostForContainer + sumOfWasteForContainer
-		wasteCosts[i] = sumOfWasteForContainer
+		costs[i] = (sumOfBaseCostForContainer + sumOfWasteForContainer) * hours
+		wasteCosts[i] = (sumOfWasteForContainer) * hours
 	}
 	return costs, wasteCosts
 }
