@@ -8,7 +8,9 @@ type ICostCalculator interface {
 		nodePrice, hours float64) ([]float64, []float64)
 }
 
-//Badmodel
+//A way to enforce the use of interface. Will give an error when compiling if interface is not implemented on the models.
+var _ ICostCalculator = (*BadModel)(nil)
+var _ ICostCalculator = (*GoodModel)(nil)
 type BadModel struct {
 }
 
