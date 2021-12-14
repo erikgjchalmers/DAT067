@@ -88,6 +88,7 @@ func TestGoodModel(t *testing.T) {
 	for _, v := range prices {
 		sum += v
 	}
+	assert.InDelta(t, use[0][0], 25, epsilon)
 	assert.InDelta(t, 1, one, epsilon)
 	assert.InDelta(t, 100, nprice, epsilon)
 	assert.InDelta(t, 100, sum, epsilon)

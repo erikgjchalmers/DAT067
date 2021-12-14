@@ -41,11 +41,16 @@ func (m GoodModel) CalculateCost(nodeResources []float64, usagePerContainer [][]
 	}
 	m.Balance = normalizeSlice(m.Balance)
 
-	//Converting the usage array to percentage.
-	//TODO: Currently changes the slice. Fix!
+	//Making a new array to store the data.
+	percentUsePerContainer := make([][]float64, len(usagePerContainer))
+	for i := range percentUsePerContainer {
+		percentUsePerContainer[i] = make([]float64, len(nodeResources))
+	}
+
+	//Converting the usage array to percentage and storing in new array.
 	for i := range usagePerContainer {
 		for j, v := range usagePerContainer[i] {
-			usagePerContainer[i][j] = v / nodeResources[j]
+			percentUsePerContainer[i][j] = v / nodeResources[j]
 		}
 	}
 
@@ -54,8 +59,8 @@ func (m GoodModel) CalculateCost(nodeResources []float64, usagePerContainer [][]
 	//For each resource
 	for i := range nodeResources {
 		//For each container
-		for j := range usagePerContainer {
-			totalUseOfResource[i] += usagePerContainer[j][i]
+		for j := range percentUsePerContainer {
+			totalUseOfResource[i] += percentUsePerContainer[j][i]
 		}
 		wastedResources[i] = 1 - totalUseOfResource[i]
 	}
@@ -81,13 +86,11 @@ func (m GoodModel) CalculateCost(nodeResources []float64, usagePerContainer [][]
 	//Calculate costs
 	costs := make([]float64, len(nodeResources))
 	wasteCosts := make([]float64, len(nodeResources))
-	for i, con := range usagePerContainer {
+	for i, con := range percentUsePerContainer {
 		var sumOfBaseCostForContainer float64 = 0
 		var sumOfWasteForContainer float64 = 0
 		for j, costOfDimensionForContainer := range con {
 			//The cost for the resources used and also the cost for the wasted resources.
-			//TODO: Doublecheck this.
-
 			sumOfBaseCostForContainer += nodePrice * m.Balance[j] * costOfDimensionForContainer
 			sumOfWasteForContainer += propOfWastedCost[j] * wastedCost * (con[j] / totalUseOfResource[j])
 		}
