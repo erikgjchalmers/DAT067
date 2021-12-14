@@ -77,6 +77,65 @@ func getResourceUsageQuery(resource string, node string) (float64, promv1.Warnin
 	return value, warnings, err
 }
 
+func GetDeploymentToNode() (map[string]string, promv1.Warnings, error) {
+	//creat query that gets all pods in cluster
+
+	result, warnings, err := Query("kube_deployment_labels", localAPI)
+
+	vector, ok := result.(model.Vector)
+
+	if !ok {
+		return nil, nil, fmt.Errorf("Pods CPU usage query did not return a Vector.")
+	}
+
+	if len(vector) == 0 {
+		return nil, nil, fmt.Errorf("Pods CPU usage query returned empty result.")
+	}
+	resultMap := make(map[string]string)
+
+	for _, sample := range vector {
+		labelSet := model.LabelSet(sample.Metric)
+		node := string(labelSet["kubernetes_node"])
+		deployment := string(labelSet["deployment"])
+
+		//fmt.Printf("Pod %s is running on node %s and is currently using %.6f cores of CPU.\n", pod, node, float64(sample.Value))
+		resultMap[deployment] = node
+	}
+
+	return resultMap, warnings, err
+
+}
+
+func GetPodsOfNode(node string) ([]string, promv1.Warnings, error) {
+	//strBuilder := fmt.Sprintf("kube_node_status_capacity{resource='cpu', node='%s'}", node)
+	//result, warnings, err := Query(strBuilder, localAPI)
+	//creat query that gets all pods in cluster
+	strBuilder := fmt.Sprintf("kube_pod_info{node='%s'}", node)
+	result, warnings, err := Query(strBuilder, localAPI)
+
+	vector, ok := result.(model.Vector)
+
+	if !ok {
+		return nil, nil, fmt.Errorf("Pods CPU usage query did not return a Vector.")
+	}
+
+	if len(vector) == 0 {
+		return nil, nil, fmt.Errorf("Pods CPU usage query returned empty result.")
+	}
+	//resultMap := make(map[string]string)
+	a := []string{}
+
+	for _, sample := range vector {
+		labelSet := model.LabelSet(sample.Metric)
+		//node := string(labelSet["node"])
+		pod := string(labelSet["pod"])
+
+		//fmt.Printf("Pod %s is running on node %s and is currently using %.6f cores of CPU.\n", pod, node, float64(sample.Value))
+		a = append(a, pod)
+	}
+	return a, warnings, err
+}
+
 func GroupByDeployment() map[string]string {
 	var podByDeployment map[string]string
 	//var podByReplica map[string]string
