@@ -1,6 +1,7 @@
 package models
 
-// [price/hour] * hour
+//@Author Erik Gjers
+//Allows calculating cost based on use.
 type ICostCalculator interface {
 	CalculateCost(
 		allocation []float64,
@@ -11,20 +12,27 @@ type ICostCalculator interface {
 //A way to enforce the use of interface. Will give an error when compiling if interface is not implemented on the models.
 var _ ICostCalculator = (*BadModel)(nil)
 var _ ICostCalculator = (*GoodModel)(nil)
+
+//@Author Erik Gjers
+//A model that only takes the first container and considers the rest of the node wasted. Doesn't add the wasted cost.
 type BadModel struct {
 }
 
+//@Author Erik Gjers
 func (m BadModel) CalculateCost(capacity []float64, usage [][]float64, nodePrice float64, hours float64) ([]float64, []float64) {
 	costOfFirstContainer := []float64{nodePrice * hours * (usage[0][0] * usage[0][1]) / (capacity[0] * capacity[1])}
 	waste := []float64{nodePrice * hours * (1 - (usage[0][0]*usage[0][1])/(capacity[0]*capacity[1]))}
 	return costOfFirstContainer, waste
 }
 
-//Goodmodel
+//@Author Erik Gjers
+//A model that calculates cost based off of several factors: Waste on the node, a balance set between the various dimensions allowing different values for the dimensions.
+//Works for any number of dimensions, but will be used for 2 dimensions mostly - CPU and RAM.
 type GoodModel struct {
 	Balance []float64
 }
 
+//@Author Erik Gjers
 func (m GoodModel) CalculateCost(nodeResources []float64, usagePerContainer [][]float64, nodePrice float64, hours float64) ([]float64, []float64) {
 
 	//Make sure that Balance is normalized(Is there a way to do this on model declaration?)
@@ -89,6 +97,8 @@ func (m GoodModel) CalculateCost(nodeResources []float64, usagePerContainer [][]
 	return costs, wasteCosts
 }
 
+//@Author Erik Gjers
+//Causes a slice to normalize, aka sum to 1.
 func normalizeSlice(arr []float64) []float64 {
 	var sum float64 = 0
 	for _, n := range arr {
