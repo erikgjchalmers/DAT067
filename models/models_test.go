@@ -9,11 +9,6 @@ import (
 
 const epsilon float64 = 0.001
 
-func TestImportantFunction(t *testing.T) {
-	//assert = assert.New(t)
-	assert.InDelta(t, 3, 3, epsilon)
-}
-
 func TestNormalizeSlice(t *testing.T) {
 	slice := []float64{1}
 	slice = normalizeSlice(slice)
