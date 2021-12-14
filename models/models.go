@@ -5,15 +5,17 @@ type ICostCalculator interface {
 	CalculateCost(
 		allocation []float64,
 		usage [][]float64,
-		nodePrice, hours float64) []float64
+		nodePrice, hours float64) ([]float64, []float64)
 }
 
 //Badmodel
 type BadModel struct {
 }
 
-func (m BadModel) CalculateCost(capacity []float64, usage []float64, nodePrice float64, hours float64) []float64 {
-	return []float64{nodePrice * hours * (usage[0] * usage[1]) / (capacity[0] * capacity[1])}
+func (m BadModel) CalculateCost(capacity []float64, usage []float64, nodePrice float64, hours float64) ([]float64, []float64) {
+	costOfFirstContainer := []float64{nodePrice * hours * (usage[0] * usage[1]) / (capacity[0] * capacity[1])}
+	waste := []float64{nodePrice * hours * (1 - (usage[0]*usage[1])/(capacity[0]*capacity[1]))}
+	return costOfFirstContainer, waste
 }
 
 //Goodmodel
