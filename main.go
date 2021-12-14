@@ -28,6 +28,7 @@ func main() {
 	costmodel := models.GoodModel{Balance: []float64{2, 1}}
 	price := costmodel.CalculateCost([]float64{memCapacity, cpuCapacity}, [][]float64{{memUsage, cpuUsage}}, 10, 1)
 	fmt.Printf("Your node costs %f dollars.\n", price[0])
+	prometheus.GroupByDeployment()
 
 	//result, warnings, err := prometheus.Query(query, api)
 	//fmt.Println("WOPDIDOO:", result)

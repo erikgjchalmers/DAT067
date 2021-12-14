@@ -77,6 +77,47 @@ func getResourceUsageQuery(resource string, node string) (float64, promv1.Warnin
 	return value, warnings, err
 }
 
+func GroupByDeployment() map[string]string {
+	var podByDeployment map[string]string
+	//var podByReplica map[string]string
+	//var replicaByDeployment map[string]string
+	podOwnerResult, podOwnerWarnings, podOwnerErr := Query("kube_pod_owner{owner_kind='ReplicaSet'}", localAPI)
+	if podOwnerWarnings != nil {
+		println("kube_pod_owner warning")
+	}
+	if podOwnerErr != nil {
+		println("kube_pod_owner error")
+	}
+	/*ReplicaOwnerResult, ReplicaOwnerWarnings, ReplicaOwnerErr := Query("kube_replicaset_owner{owner_kinde='Deployment'}", localAPI)
+	if ReplicaOwnerWarnings != nil {
+		println("kube_replica_owner warning")
+	}
+	if ReplicaOwnerErr != nil {
+		println("kube_replica_owner error")*/
+
+	vector := podOwnerResult.(model.Vector)
+	for _, sample := range vector {
+		labelSet := model.LabelSet(sample.Metric)
+
+		metricName := labelSet[model.MetricNameLabel]
+
+		if metricName != "" {
+			fmt.Printf("Metric name: %s, time stamp: %s, value: %v\n", metricName, sample.Timestamp.Time(), sample.Value)
+		}
+
+		for key, value := range labelSet {
+			if key == "owner_name" {
+				println("WOOPDIDOO:")
+				fmt.Printf("\tLabel name: %s, value: %s\n", key, value)
+			}
+		}
+
+		fmt.Printf("\n")
+	}
+
+	return podByDeployment
+}
+
 type prometheusInterface interface {
 	GetCPUNodeCapacity(node string) (float64, promv1.Warnings, error)
 }
