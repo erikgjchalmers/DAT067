@@ -81,8 +81,8 @@ func getNodeResourceUsageQuery(resource string, node string) (float64, promv1.Wa
  * Author: Erik Wahlberger
  * Retrieves a map of pod-CPU usage key-value pairs. CPU usage is given in the amount of CPU cores being used by each respective pod
  */
-func GetPodsCPUUsage() (map[string]float64, promv1.Warnings, error) {
-	resourceUsageQuery := "sum(irate(container_cpu_usage_seconds_total{container!='POD', container!='', pod!=''}[5m])) by (pod, instance)"
+func GetPodsCPUUsage(node string) (map[string]float64, promv1.Warnings, error) {
+	resourceUsageQuery := fmt.Sprintf("sum(irate(container_cpu_usage_seconds_total{container!='POD', container!='', pod!='', instance='%s'}[5m])) by (pod)", node)
 	result, warnings, err := Query(resourceUsageQuery, localAPI)
 	vector, ok := result.(model.Vector)
 
@@ -99,7 +99,6 @@ func GetPodsCPUUsage() (map[string]float64, promv1.Warnings, error) {
 	for _, sample := range vector {
 		labelSet := model.LabelSet(sample.Metric)
 		pod := string(labelSet["pod"])
-		node := string(labelSet["instance"])
 
 		fmt.Printf("Pod %s is running on node %s and is currently using %.6f cores of CPU.\n", pod, node, float64(sample.Value))
 		usageMap[pod] = float64(sample.Value)
@@ -112,8 +111,8 @@ func GetPodsCPUUsage() (map[string]float64, promv1.Warnings, error) {
  * Author: Erik Wahlberger
  * Retrieves a map of pod-RAM usage key-value pairs. RAM usage is given in bytes being used by each respective pod
  */
-func GetPodsMemoryUsage() (map[string]float64, promv1.Warnings, error) {
-	resourceUsageQuery := "sum(container_memory_usage_bytes{pod != ''}) by (instance, pod)"
+func GetPodsMemoryUsage(node string) (map[string]float64, promv1.Warnings, error) {
+	resourceUsageQuery := fmt.Sprintf("sum(container_memory_usage_bytes{container!='POD', container !='', pod != '', instance='%s'}) by (pod)", node)
 	result, warnings, err := Query(resourceUsageQuery, localAPI)
 	vector, ok := result.(model.Vector)
 
@@ -130,7 +129,6 @@ func GetPodsMemoryUsage() (map[string]float64, promv1.Warnings, error) {
 	for _, sample := range vector {
 		labelSet := model.LabelSet(sample.Metric)
 		pod := string(labelSet["pod"])
-		node := string(labelSet["instance"])
 
 		fmt.Printf("Pod %s is running on node %s and is currently using %.1f bytes of RAM.\n", pod, node, float64(sample.Value))
 		usageMap[pod] = float64(sample.Value)
