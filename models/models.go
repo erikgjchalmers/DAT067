@@ -1,27 +1,39 @@
 package models
 
-// [price/hour] * hour
+//@Author Erik Gjers
+//Allows calculating cost based on use.
 type ICostCalculator interface {
 	CalculateCost(
 		allocation []float64,
 		usage [][]float64,
-		nodePrice, hours float64) []float64
+		nodePrice, hours float64) ([]float64, []float64)
 }
 
-//Badmodel
+//A way to enforce the use of interface. Will give an error when compiling if interface is not implemented on the models.
+var _ ICostCalculator = (*BadModel)(nil)
+var _ ICostCalculator = (*GoodModel)(nil)
+
+//@Author Erik Gjers
+//A model that only takes the first container and considers the rest of the node wasted. Doesn't add the wasted cost.
 type BadModel struct {
 }
 
-func (m BadModel) CalculateCost(capacity []float64, usage []float64, nodePrice float64, hours float64) []float64 {
-	return []float64{nodePrice * hours * (usage[0] * usage[1]) / (capacity[0] * capacity[1])}
+//@Author Erik Gjers
+func (m BadModel) CalculateCost(capacity []float64, usage [][]float64, nodePrice float64, hours float64) ([]float64, []float64) {
+	costOfFirstContainer := []float64{nodePrice * hours * (usage[0][0] * usage[0][1]) / (capacity[0] * capacity[1])}
+	waste := []float64{nodePrice * hours * (1 - (usage[0][0]*usage[0][1])/(capacity[0]*capacity[1]))}
+	return costOfFirstContainer, waste
 }
 
-//Goodmodel
+//@Author Erik Gjers
+//A model that calculates cost based off of several factors: Waste on the node, a balance set between the various dimensions allowing different values for the dimensions.
+//Works for any number of dimensions, but will be used for 2 dimensions mostly - CPU and RAM.
 type GoodModel struct {
 	Balance []float64
 }
 
-func (m GoodModel) CalculateCost(nodeResources []float64, usagePerContainer [][]float64, nodePrice float64, hours float64) []float64 {
+//@Author Erik Gjers
+func (m GoodModel) CalculateCost(nodeResources []float64, usagePerContainer [][]float64, nodePrice float64, hours float64) ([]float64, []float64) {
 
 	//Make sure that Balance is normalized(Is there a way to do this on model declaration?)
 	if m.Balance == nil {
@@ -29,11 +41,16 @@ func (m GoodModel) CalculateCost(nodeResources []float64, usagePerContainer [][]
 	}
 	m.Balance = normalizeSlice(m.Balance)
 
-	//Converting the usage array to percentage.
-	//TODO: Currently changes the slice. Fix!
+	//Making a new array to store the data.
+	percentUsePerContainer := make([][]float64, len(usagePerContainer))
+	for i := range percentUsePerContainer {
+		percentUsePerContainer[i] = make([]float64, len(nodeResources))
+	}
+
+	//Converting the usage array to percentage and storing in new array.
 	for i := range usagePerContainer {
 		for j, v := range usagePerContainer[i] {
-			usagePerContainer[i][j] = v / nodeResources[j]
+			percentUsePerContainer[i][j] = v / nodeResources[j]
 		}
 	}
 
@@ -42,8 +59,8 @@ func (m GoodModel) CalculateCost(nodeResources []float64, usagePerContainer [][]
 	//For each resource
 	for i := range nodeResources {
 		//For each container
-		for j := range usagePerContainer {
-			totalUseOfResource[i] += usagePerContainer[j][i]
+		for j := range percentUsePerContainer {
+			totalUseOfResource[i] += percentUsePerContainer[j][i]
 		}
 		wastedResources[i] = 1 - totalUseOfResource[i]
 	}
@@ -68,18 +85,23 @@ func (m GoodModel) CalculateCost(nodeResources []float64, usagePerContainer [][]
 	propOfWastedCost = normalizeSlice(propOfWastedCost)
 	//Calculate costs
 	costs := make([]float64, len(nodeResources))
-	for i, con := range usagePerContainer {
-		var sumOfCostsForContainer float64 = 0
+	wasteCosts := make([]float64, len(nodeResources))
+	for i, con := range percentUsePerContainer {
+		var sumOfBaseCostForContainer float64 = 0
+		var sumOfWasteForContainer float64 = 0
 		for j, costOfDimensionForContainer := range con {
 			//The cost for the resources used and also the cost for the wasted resources.
-			//TODO: Doublecheck this.
-			sumOfCostsForContainer += nodePrice*m.Balance[j]*costOfDimensionForContainer + propOfWastedCost[j]*wastedCost*(con[j]/totalUseOfResource[j])
+			sumOfBaseCostForContainer += nodePrice * m.Balance[j] * costOfDimensionForContainer
+			sumOfWasteForContainer += propOfWastedCost[j] * wastedCost * (con[j] / totalUseOfResource[j])
 		}
-		costs[i] = sumOfCostsForContainer
+		costs[i] = (sumOfBaseCostForContainer + sumOfWasteForContainer) * hours
+		wasteCosts[i] = sumOfWasteForContainer * hours
 	}
-	return costs
+	return costs, wasteCosts
 }
 
+//@Author Erik Gjers
+//Causes a slice to normalize, aka sum to 1.
 func normalizeSlice(arr []float64) []float64 {
 	var sum float64 = 0
 	for _, n := range arr {
