@@ -13,6 +13,11 @@ import (
 	"github.com/prometheus/common/model"
 )
 
+type ResourceUsage struct {
+	CpuUsage float64
+	MemUsage float64
+}
+
 var localAPI promv1.API
 
 func ImportantFunction() int {
@@ -60,14 +65,14 @@ func GetMemoryNodeCapacity(node string) (float64, promv1.Warnings, error) {
 }
 
 func GetCPUNodeUsage(node string) (float64, promv1.Warnings, error) {
-	return getResourceUsageQuery("cpu", node)
+	return getNodeResourceUsageQuery("cpu", node)
 }
 
 func GetMemoryNodeUsage(node string) (float64, promv1.Warnings, error) {
-	return getResourceUsageQuery("memory", node)
+	return getNodeResourceUsageQuery("memory", node)
 }
 
-func getResourceUsageQuery(resource string, node string) (float64, promv1.Warnings, error) {
+func getNodeResourceUsageQuery(resource string, node string) (float64, promv1.Warnings, error) {
 	resourceUsageQuery := fmt.Sprintf("kube_node_status_capacity{resource='%s', node='%s'} - avg_over_time(kube_node_status_allocatable{resource='%s', node='%s'}[1h])", resource, node, resource, node)
 	result, warnings, err := Query(resourceUsageQuery, localAPI)
 	vector := result.(model.Vector)
@@ -78,14 +83,108 @@ func getResourceUsageQuery(resource string, node string) (float64, promv1.Warnin
 }
 
 /*
-*Returns map with replicaset as key and deployment it belong to as value
-*
+ * Author: Erik Wahlberger
+ * Retrieves a map of pod-CPU usage key-value pairs. CPU usage is given in the amount of CPU cores being used by each respective pod
+ */
+func GetPodsCPUUsage(node string) (map[string]float64, promv1.Warnings, error) {
+	resourceUsageQuery := fmt.Sprintf("sum(irate(container_cpu_usage_seconds_total{container!='POD', container!='', pod!='', instance='%s'}[5m])) by (pod)", node)
+	result, warnings, err := Query(resourceUsageQuery, localAPI)
+	vector, ok := result.(model.Vector)
+
+	if !ok {
+		return nil, nil, fmt.Errorf("Pods CPU usage query did not return a Vector.")
+	}
+
+	if len(vector) == 0 {
+		return nil, nil, fmt.Errorf("Pods CPU usage query returned empty result.")
+	}
+
+	usageMap := make(map[string]float64)
+
+	for _, sample := range vector {
+		labelSet := model.LabelSet(sample.Metric)
+		pod := string(labelSet["pod"])
+
+		usageMap[pod] = float64(sample.Value)
+	}
+
+	return usageMap, warnings, err
+}
+
+/*
+ * Author: Erik Wahlberger
+ * Retrieves a map of pod-RAM usage key-value pairs. RAM usage is given in bytes being used by each respective pod
+ */
+func GetPodsMemoryUsage(node string) (map[string]float64, promv1.Warnings, error) {
+	resourceUsageQuery := fmt.Sprintf("sum(container_memory_usage_bytes{container!='POD', container !='', pod != '', instance='%s'}) by (pod)", node)
+	result, warnings, err := Query(resourceUsageQuery, localAPI)
+	vector, ok := result.(model.Vector)
+	usageMap := make(map[string]float64)
+
+	if !ok {
+		return nil, nil, fmt.Errorf("Pods memory usage query did not return a Vector.")
+	}
+
+	if len(vector) == 0 {
+		return nil, nil, fmt.Errorf("Pods Memory usage query returned empty result.")
+	}
+
+	for _, sample := range vector {
+		labelSet := model.LabelSet(sample.Metric)
+		pod := string(labelSet["pod"])
+		usageMap[pod] = float64(sample.Value)
+	}
+
+	return usageMap, warnings, err
+}
+
+func GetPodsResourceUsage(node string) (map[string]ResourceUsage, promv1.Warnings, error) {
+	cpuUsages, cpuWarnings, cpuErrors := GetPodsCPUUsage(node)
+	memUsages, memWarnings, memErrors := GetPodsMemoryUsage(node)
+
+	var warnings []string
+	resources := make(map[string]ResourceUsage)
+
+	if cpuErrors != nil {
+		return nil, cpuWarnings, cpuErrors
+	}
+
+	if memErrors != nil {
+		return nil, memWarnings, memErrors
+	}
+
+	if cpuWarnings != nil {
+		warnings = append(warnings, cpuWarnings...)
+	}
+
+	if memWarnings != nil {
+		warnings = append(warnings, memWarnings...)
+	}
+
+	for pod, cpuValue := range cpuUsages {
+		memValue, ok := memUsages[pod]
+
+		if !ok {
+			continue
+		}
+
+		resources[pod] = ResourceUsage{
+			CpuUsage: cpuValue,
+			MemUsage: memValue,
+		}
+	}
+
+	return resources, warnings, nil
+}
+
+/*
+ *Returns map with replicaset as key and deployment it belong to as value
+ *
  */
 func getReplicasetToDeployment() (map[string]string, promv1.Warnings, error) {
 	//creat query that gets all pods in cluster
 
 	result, warnings, err := Query("kube_replicaset_owner{owner_kind='Deployment'}", localAPI)
-
 	vector, ok := result.(model.Vector)
 
 	if !ok {

@@ -94,15 +94,27 @@ func main() {
 
 	if err != nil {
 		fmt.Printf("An error occured when creating the Kubernetes client: '%v'", err)
+		return
 	}
 
 	pricedNodes, err := azure.GetPricedAzureNodes(clientSet)
 
 	if err != nil {
 		fmt.Printf("An error occured while retrieving Azure node prices: '%v'", err)
+		return
 	}
 
 	azure.PrintNodes(pricedNodes)
+	resourceUsages, warnings, err := prometheus.GetPodsResourceUsage("aks-standard1-15038067-vmss000001")
+
+	if err != nil {
+		fmt.Printf("An error occured while retrieving pod resource usage from Prometheus: %s", err)
+		return
+	}
+
+	for key, value := range resourceUsages {
+		fmt.Printf("The pod '%s' is currently using %.6f CPU cores and %.1f bytes of RAM.\n", key, value.CpuUsage, value.MemUsage)
+	}
 }
 
 func printVector(v model.Vector) {
