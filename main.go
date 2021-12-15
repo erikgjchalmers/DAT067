@@ -60,6 +60,7 @@ func main() {
 	resultMap = prometheus.GetPodsToDeployment()
 	fmt.Print("print all pods and which deployment it belongs to:\n\n")
 	fmt.Print(resultMap)
+	fmt.Print(len(resultMap))
 
 	/* 	switch result.Type() {
 	   	case model.ValVector:

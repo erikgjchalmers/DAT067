@@ -168,7 +168,10 @@ func GetPodsToDeployment() map[string]string {
 	// loop to match every pod with a deploymet with help of the replicaset the pod belongs to
 	for key, element := range podsToRep {
 
-		var deployment = repTodep[element]
+		var deployment, ok = repTodep[element]
+		if !ok {
+			fmt.Print("PANIC!")
+		}
 		resultMap[key] = deployment
 
 	}
