@@ -149,8 +149,7 @@ func main() {
 			index += 1
 		}
 	}
-	deploymentMap := make(map[string]string)
-	deploymentMap = prometheus.GetPodsToDeployment()
+	deploymentMap := prometheus.GetPodsToDeployment()
 	//Sum all pod costs to relevant deployment cost.
 	priceMap := make(map[string]float64)
 
@@ -166,6 +165,20 @@ func main() {
 	for d, p := range priceMap {
 		fmt.Printf("%s has a cost of %f \n", d, p)
 	}
+
+	sumNode := 0.0
+	for _, node := range pricedNodes {
+		sumNode += node.Price
+	}
+	sumPrice := 0.0
+	for _, v := range podPrices {
+		sumPrice += v
+	}
+	sumPriceMap := 0.0
+	for _, v := range priceMap {
+		sumPriceMap += v
+	}
+	fmt.Printf("Cost of nodes was %f. Total cost of pods was %f. \nThe ones being used in deployments amount to %f. \n", sumNode, sumPrice, sumPriceMap)
 }
 
 func printVector(v model.Vector) {
