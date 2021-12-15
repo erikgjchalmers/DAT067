@@ -115,6 +115,57 @@ func main() {
 	for key, value := range resourceUsages {
 		fmt.Printf("The pod '%s' is currently using %.6f CPU cores and %.1f bytes of RAM.\n", key, value.CpuUsage, value.MemUsage)
 	}
+
+	//Get nodes.
+	//Get nodes cost.
+	//pricedNodes, err := azure.GetPricedAzureNodes(clientSet)
+
+	//Get pods
+	//Get pod resources
+	podPrices := make(map[string]float64)
+	for _, node := range pricedNodes {
+		pods, _, _ := prometheus.GetPodsResourceUsage(node.Node.Name)
+		monster := make([][]float64, len(pods))
+		index := 0
+		for _, resourceUsage := range pods {
+			monster[index] = []float64{resourceUsage.MemUsage, resourceUsage.CpuUsage}
+			index += 1
+		}
+
+		//TODO: We get all the pods on a node, even those not belonging to a deployment.
+		//Calculate pods' cost
+		nodeMem, _, _ := prometheus.GetMemoryNodeCapacity(node.Node.Name)
+		nodeCPU, _, _ := prometheus.GetCPUNodeCapacity(node.Node.Name)
+		costCalculator := models.GoodModel{Balance: []float64{1, 1}}
+		price, _ := costCalculator.CalculateCost(
+			[]float64{
+				nodeMem,
+				nodeCPU},
+			monster,
+			node.Price, 1)
+		index = 0
+		for pod, _ := range pods {
+			podPrices[pod] = price[index]
+			index += 1
+		}
+	}
+	deploymentMap := make(map[string]string)
+	deploymentMap = prometheus.GetPodsToDeployment()
+	//Sum all pod costs to relevant deployment cost.
+	priceMap := make(map[string]float64)
+
+	for pod, deployment := range deploymentMap {
+		price, ok := podPrices[pod]
+		if !ok {
+			continue
+		}
+		priceMap[deployment] += price
+	}
+	//Print all the deployment costs.
+	fmt.Printf("\n")
+	for d, p := range priceMap {
+		fmt.Printf("%s has a cost of %f \n", d, p)
+	}
 }
 
 func printVector(v model.Vector) {
