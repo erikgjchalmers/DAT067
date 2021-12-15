@@ -29,18 +29,22 @@ func main() {
 	price := costmodel.CalculateCost([]float64{memCapacity, cpuCapacity}, [][]float64{{memUsage, cpuUsage}}, 10, 1)
 	fmt.Printf("Your node costs %f dollars.\n", price[0])
 
-	resultMap := []string{}
-	resultMap, warnings, err = prometheus.GetPodsOfNode("aks-standard1-15038067-vmss000001")
-	fmt.Print("aks-standard1-15038067-vmss000001")
-	fmt.Print(resultMap)
-	resultMap, warnings, err = prometheus.GetPodsOfNode("aks-default-15038067-vmss000000")
-	fmt.Print("aks-default-15038067-vmss000000")
-	fmt.Print(resultMap)
-	resultMap, warnings, err = prometheus.GetPodsOfNode("aks-standard1-15038067-vmss000000")
-	fmt.Print("aks-standard1-15038067-vmss000000")
-	fmt.Print(resultMap)
-	//result, warnings, err := prometheus.Query(query, api)
-	//fmt.Println("WOPDIDOO:", result)
+	fmt.Printf("Data from Prometheus:\n\n")
+
+	// print all pods belonging to a specific node
+	resultPods := []string{}
+	resultPods, warnings, err = prometheus.GetPodsOfNode("aks-standard1-15038067-vmss000001")
+	fmt.Print("aks-standard1-15038067-vmss000001 hosting pods:\n\n")
+	fmt.Println(resultPods)
+	fmt.Print("\n\n")
+	resultPods, warnings, err = prometheus.GetPodsOfNode("aks-default-15038067-vmss000000")
+	fmt.Print("aks-default-15038067-vmss000000 hosting pods:\n\n")
+	fmt.Println(resultPods)
+	fmt.Print("\n\n")
+	resultPods, warnings, err = prometheus.GetPodsOfNode("aks-standard1-15038067-vmss000000")
+	fmt.Print("aks-standard1-15038067-vmss000000 hosting pods:\n\n")
+	fmt.Println(resultPods)
+	fmt.Print("\n\n")
 
 	if err != nil {
 		fmt.Printf("An error occured when querying Prometheus: %v\n", err)
@@ -51,7 +55,11 @@ func main() {
 		fmt.Printf("Warnings during query: %v\n", warnings)
 	}
 
-	fmt.Printf("Data from Prometheus:\n\n")
+	//print all pods and which deployment it belongs to
+	resultMap := make(map[string]string)
+	resultMap = prometheus.GetPodsToDeployment()
+	fmt.Print("print all pods and which deployment it belongs to:\n\n")
+	fmt.Print(resultMap)
 
 	/* 	switch result.Type() {
 	   	case model.ValVector:
