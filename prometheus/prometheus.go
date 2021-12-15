@@ -13,6 +13,11 @@ import (
 	"github.com/prometheus/common/model"
 )
 
+type ResourceUsage struct {
+	CpuUsage float64
+	MemUsage float64
+}
+
 var localAPI promv1.API
 
 func ImportantFunction() int {
@@ -100,7 +105,6 @@ func GetPodsCPUUsage(node string) (map[string]float64, promv1.Warnings, error) {
 		labelSet := model.LabelSet(sample.Metric)
 		pod := string(labelSet["pod"])
 
-		fmt.Printf("Pod %s is running on node %s and is currently using %.6f cores of CPU.\n", pod, node, float64(sample.Value))
 		usageMap[pod] = float64(sample.Value)
 	}
 
@@ -130,11 +134,49 @@ func GetPodsMemoryUsage(node string) (map[string]float64, promv1.Warnings, error
 		labelSet := model.LabelSet(sample.Metric)
 		pod := string(labelSet["pod"])
 
-		fmt.Printf("Pod %s is running on node %s and is currently using %.1f bytes of RAM.\n", pod, node, float64(sample.Value))
 		usageMap[pod] = float64(sample.Value)
 	}
 
 	return usageMap, warnings, err
+}
+
+func GetPodsResourceUsage(node string) (map[string]ResourceUsage, promv1.Warnings, error) {
+	cpuUsages, cpuWarnings, cpuErrors := GetPodsCPUUsage(node)
+	memUsages, memWarnings, memErrors := GetPodsMemoryUsage(node)
+
+	var warnings []string
+	resources := make(map[string]ResourceUsage)
+
+	if cpuErrors != nil {
+		return nil, cpuWarnings, cpuErrors
+	}
+
+	if memErrors != nil {
+		return nil, memWarnings, memErrors
+	}
+
+	if cpuWarnings != nil {
+		warnings = append(warnings, cpuWarnings...)
+	}
+
+	if memWarnings != nil {
+		warnings = append(warnings, memWarnings...)
+	}
+
+	for pod, cpuValue := range cpuUsages {
+		memValue, ok := memUsages[pod]
+
+		if !ok {
+			continue
+		}
+
+		resources[pod] = ResourceUsage{
+			CpuUsage: cpuValue,
+			MemUsage: memValue,
+		}
+	}
+
+	return resources, warnings, nil
 }
 
 type prometheusInterface interface {
