@@ -120,9 +120,10 @@ func main() {
 	for d, p := range priceMap {
 		fmt.Printf("%s has a cost of %f \n", d, p)
 	}
-
+	fmt.Printf("\nNode prices: \n")
 	sumNode := 0.0
 	for _, node := range pricedNodes {
+		fmt.Printf("Node %s costs %f.\n", node.Node.Name, node.Price)
 		sumNode += node.Price
 	}
 	sumPrice := 0.0
@@ -133,7 +134,7 @@ func main() {
 	for _, v := range priceMap {
 		sumPriceMap += v
 	}
-	fmt.Printf("Cost of nodes was %f. Total cost of pods was %f. \nThe ones being used in deployments amount to %f. \n", sumNode, sumPrice, sumPriceMap)
+	fmt.Printf("Cost of nodes was %f. Total cost of pods was %f. \nThe pods being used in deployments amount to %f. \n", sumNode, sumPrice, sumPriceMap)
 }
 
 func printVector(v model.Vector) {
