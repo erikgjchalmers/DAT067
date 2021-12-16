@@ -47,8 +47,6 @@ func main() {
 	   		os.Exit(1)
 	   	} */
 
-	fmt.Printf("Data from Kubernetes API:\n\n")
-
 	clientSet, err := kubernetes.CreateClientSet()
 
 	if err != nil {
