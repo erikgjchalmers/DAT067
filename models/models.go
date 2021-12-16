@@ -34,7 +34,6 @@ type GoodModel struct {
 
 //@Author Erik Gjers
 func (m GoodModel) CalculateCost(nodeResources []float64, usagePerContainer [][]float64, nodePrice float64, hours float64) ([]float64, []float64) {
-
 	//Make sure that Balance is normalized(Is there a way to do this on model declaration?)
 	if m.Balance == nil {
 		m.Balance = make([]float64, len(nodeResources))
@@ -84,8 +83,8 @@ func (m GoodModel) CalculateCost(nodeResources []float64, usagePerContainer [][]
 	}
 	propOfWastedCost = normalizeSlice(propOfWastedCost)
 	//Calculate costs
-	costs := make([]float64, len(nodeResources))
-	wasteCosts := make([]float64, len(nodeResources))
+	costs := make([]float64, len(usagePerContainer))
+	wasteCosts := make([]float64, len(usagePerContainer))
 	for i, con := range percentUsePerContainer {
 		var sumOfBaseCostForContainer float64 = 0
 		var sumOfWasteForContainer float64 = 0
