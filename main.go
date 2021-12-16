@@ -71,7 +71,17 @@ func main() {
 	//Get pod resources
 	podPrices := make(map[string]float64)
 	for _, node := range pricedNodes {
-		pods, _, _ := prometheus.GetPodsResourceUsage(node.Node.Name)
+		pods, warnings, err := prometheus.GetPodsResourceUsage(node.Node.Name)
+
+		if err != nil {
+			fmt.Printf("An error occured when querying Prometheus: %v\n", err)
+			os.Exit(1)
+		}
+
+		if len(warnings) > 0 {
+			fmt.Printf("Warnings during query: %v\n", warnings)
+		}
+
 		monster := make([][]float64, len(pods))
 		index := 0
 		for _, resourceUsage := range pods {
