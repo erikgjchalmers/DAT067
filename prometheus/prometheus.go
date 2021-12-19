@@ -47,8 +47,21 @@ func Query(query string, api promv1.API) (model.Value, promv1.Warnings, error) {
 	return api.Query(ctx, query, time.Now())
 }
 
-func GetCPUUsageOverTime() {
-	strBuilder := fmt.Sprintf("sum(sum_over_time(irate(container_cpu_usage_seconds_total{container != 'POD', container != '', pod != ''}[5m])[1d:1h])) by (pod) / sum(count_over_time(container_cpu_usage_seconds_total{container != 'POD', container != '', pod != ''}[1d:1h])) by (pod)")
+// TODO: Return the data and let the user choose the time interval as well as the resolution
+func GetAvgCpuUsageOverTime() {
+	strBuilder := fmt.Sprintf("avg_over_time(sum by (pod) (irate(container_cpu_usage_seconds_total{container != '', container != 'POD', pod != ''}[5m]))[1h:])")
+	sTime := time.Now().Add(-24 * time.Hour)
+
+	t := promv1.Range{Start: sTime, End: time.Now(), Step: time.Hour}
+	result, _, _ := QueryOverTime(strBuilder, localAPI, t)
+	matrix := result.(model.Matrix)
+	printMatrix(matrix)
+
+}
+
+// TODO: Return the data and let the user choose the time interval as well as the resolution
+func GetAvgMemUsageOverTime() {
+	strBuilder := fmt.Sprintf("avg_over_time(sum by (pod) (container_memory_usage_bytes{container != '', container != 'POD', pod != ''})[1h:])")
 	sTime := time.Now().Add(-24 * time.Hour)
 
 	t := promv1.Range{Start: sTime, End: time.Now(), Step: time.Hour}

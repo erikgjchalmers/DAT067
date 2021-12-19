@@ -138,7 +138,14 @@ func main() {
 		sumPriceMap += v
 	}
 	fmt.Printf("Cost of nodes was %f. Total cost of pods was %f. \nThe pods being used in deployments amount to %f. \n", sumNode, sumPrice, sumPriceMap)
-	prometheus.GetCPUUsageOverTime()
+
+	fmt.Println()
+	fmt.Println("Average CPU usage over time (in CPU cores):")
+	prometheus.GetAvgCpuUsageOverTime()
+
+	fmt.Println()
+	fmt.Println("Average mem usage over time (in bytes):")
+	prometheus.GetAvgMemUsageOverTime()
 }
 
 func printVector(v model.Vector) {
