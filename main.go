@@ -111,10 +111,13 @@ func main() {
 	for pod, deployment := range deploymentMap {
 		price, ok := podPrices[pod]
 		if !ok {
+			fmt.Print("NOT OK!")
 			continue
 		}
+
 		priceMap[deployment] += price
 	}
+	fmt.Println(len(priceMap))
 	//Print all the deployment costs.
 	fmt.Printf("\n")
 	for d, p := range priceMap {
@@ -135,6 +138,7 @@ func main() {
 		sumPriceMap += v
 	}
 	fmt.Printf("Cost of nodes was %f. Total cost of pods was %f. \nThe pods being used in deployments amount to %f. \n", sumNode, sumPrice, sumPriceMap)
+	prometheus.GetCPUUsageOverTime()
 }
 
 func printVector(v model.Vector) {

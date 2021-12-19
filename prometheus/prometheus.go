@@ -36,16 +36,40 @@ func CreateAPI(address string) promv1.API {
 	localAPI = promv1.NewAPI(client)
 	return localAPI
 }
-
+func QueryOverTime(query string, api promv1.API, t promv1.Range) (model.Value, promv1.Warnings, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	return api.QueryRange(ctx, query, t)
+}
 func Query(query string, api promv1.API) (model.Value, promv1.Warnings, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	return api.Query(ctx, query, time.Now())
 }
 
+func GetCPUUsageOverTime() {
+	strBuilder := fmt.Sprintf("sum(sum_over_time(irate(container_cpu_usage_seconds_total{container != 'POD', container != '', pod != ''}[5m])[1d:1h])) by (pod) / sum(count_over_time(container_cpu_usage_seconds_total{container != 'POD', container != '', pod != ''}[1d:1h])) by (pod)")
+	sTime := time.Now().Add(-24 * time.Hour)
+
+	t := promv1.Range{Start: sTime, End: time.Now(), Step: time.Hour}
+	result, _, _ := QueryOverTime(strBuilder, localAPI, t)
+	matrix := result.(model.Matrix)
+	printMatrix(matrix)
+
+}
+
+func printMatrix(m model.Matrix) {
+	for _, sampleStream := range m {
+		fmt.Printf("Metric: %v\n", (*sampleStream).Metric.String())
+		for _, samplePair := range (*sampleStream).Values {
+			fmt.Printf("\tTime stamp; %v, value; %v\n", samplePair.Timestamp.Time(), samplePair.Value)
+		}
+	}
+}
+
 // Gets available CPU capacity
 func GetCPUNodeCapacity(node string) (float64, promv1.Warnings, error) {
-	strBuilder := fmt.Sprintf("kube_node_status_capacity{resource='cpu', node='%s'}", node)
+	strBuilder := fmt.Sprintf("kube_node_status_capacity{resource='cpu', exported_node='%s'}", node)
 	result, warnings, err := Query(strBuilder, localAPI)
 	vector := result.(model.Vector)
 	sample := vector[0]
@@ -55,7 +79,7 @@ func GetCPUNodeCapacity(node string) (float64, promv1.Warnings, error) {
 }
 
 func GetMemoryNodeCapacity(node string) (float64, promv1.Warnings, error) {
-	strBuilder := fmt.Sprintf("kube_node_status_capacity{resource='memory', node='%s'}", node)
+	strBuilder := fmt.Sprintf("kube_node_status_capacity{resource='memory', exported_node='%s'}", node)
 	result, warnings, err := Query(strBuilder, localAPI)
 	vector := result.(model.Vector)
 	sample := vector[0]
@@ -73,7 +97,7 @@ func GetMemoryNodeUsage(node string) (float64, promv1.Warnings, error) {
 }
 
 func getNodeResourceUsageQuery(resource string, node string) (float64, promv1.Warnings, error) {
-	resourceUsageQuery := fmt.Sprintf("kube_node_status_capacity{resource='%s', node='%s'} - avg_over_time(kube_node_status_allocatable{resource='%s', node='%s'}[1h])", resource, node, resource, node)
+	resourceUsageQuery := fmt.Sprintf("kube_node_status_capacity{resource='%s', exported_node='%s'} - avg_over_time(kube_node_status_allocatable{resource='%s', exported_node='%s'}[1h])", resource, node, resource, node)
 	result, warnings, err := Query(resourceUsageQuery, localAPI)
 	vector := result.(model.Vector)
 	sample := vector[0]
@@ -283,7 +307,7 @@ func GetPodsToDeployment() map[string]string {
 *
  */
 func GetPodsOfNode(node string) ([]string, promv1.Warnings, error) {
-	strBuilder := fmt.Sprintf("kube_pod_info{node='%s'}", node)
+	strBuilder := fmt.Sprintf("kube_pod_info{exported_node='%s'}", node)
 	result, warnings, err := Query(strBuilder, localAPI)
 
 	vector, ok := result.(model.Vector)
