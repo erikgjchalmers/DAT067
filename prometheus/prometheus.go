@@ -36,48 +36,57 @@ func CreateAPI(address string) promv1.API {
 	localAPI = promv1.NewAPI(client)
 	return localAPI
 }
+
+/*
+ * Authors: Jessica Barai, Erik Wahlberger
+ * Performs a Prometheus query over the specified time range t
+ */
 func QueryOverTime(query string, api promv1.API, t promv1.Range) (model.Value, promv1.Warnings, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	return api.QueryRange(ctx, query, t)
 }
+
 func Query(query string, api promv1.API) (model.Value, promv1.Warnings, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	return api.Query(ctx, query, time.Now())
 }
 
-// TODO: Return the data and let the user choose the time interval as well as the resolution
-func GetAvgCpuUsageOverTime() {
-	strBuilder := fmt.Sprintf("avg_over_time(sum by (pod) (irate(container_cpu_usage_seconds_total{container != '', container != 'POD', pod != ''}[5m]))[1h:])")
-	sTime := time.Now().Add(-24 * time.Hour)
+/*
+ * Authors: Jessica Barai, Erik Wahlberger
+ * Calculates the average CPU usage (in cores) over the specified resolution duration, and returns the average values between startTime and endTime
+ */
+func GetAvgCpuUsageOverTime(startTime time.Time, endTime time.Time, resolution time.Duration) (model.Matrix, promv1.Warnings, error) {
+	strBuilder := fmt.Sprintf("avg_over_time(sum by (pod) (irate(container_cpu_usage_seconds_total{container != '', container != 'POD', pod != ''}[5m]))[%s:])", resolution)
 
-	t := promv1.Range{Start: sTime, End: time.Now(), Step: time.Hour}
-	result, _, _ := QueryOverTime(strBuilder, localAPI, t)
-	matrix := result.(model.Matrix)
-	printMatrix(matrix)
+	t := promv1.Range{Start: startTime, End: endTime, Step: resolution}
+	result, warnings, err := QueryOverTime(strBuilder, localAPI, t)
 
-}
-
-// TODO: Return the data and let the user choose the time interval as well as the resolution
-func GetAvgMemUsageOverTime() {
-	strBuilder := fmt.Sprintf("avg_over_time(sum by (pod) (container_memory_usage_bytes{container != '', container != 'POD', pod != ''})[1h:])")
-	sTime := time.Now().Add(-24 * time.Hour)
-
-	t := promv1.Range{Start: sTime, End: time.Now(), Step: time.Hour}
-	result, _, _ := QueryOverTime(strBuilder, localAPI, t)
-	matrix := result.(model.Matrix)
-	printMatrix(matrix)
-
-}
-
-func printMatrix(m model.Matrix) {
-	for _, sampleStream := range m {
-		fmt.Printf("Metric: %v\n", (*sampleStream).Metric.String())
-		for _, samplePair := range (*sampleStream).Values {
-			fmt.Printf("\tTime stamp; %v, value; %v\n", samplePair.Timestamp.Time(), samplePair.Value)
-		}
+	if err != nil {
+		return nil, warnings, err
 	}
+
+	matrix := result.(model.Matrix)
+	return matrix, warnings, nil
+}
+
+/*
+ * Authors: Jessica Barai, Erik Wahlberger
+ * Calculates the average RAM usage (in bytes) over the specified resolution duration, and returns the average values between startTime and endTime
+ */
+func GetAvgMemUsageOverTime(startTime time.Time, endTime time.Time, resolution time.Duration) (model.Matrix, promv1.Warnings, error) {
+	strBuilder := fmt.Sprintf("avg_over_time(sum by (pod) (container_memory_usage_bytes{container != '', container != 'POD', pod != ''})[%s:])", resolution)
+
+	t := promv1.Range{Start: startTime, End: endTime, Step: resolution}
+	result, warnings, err := QueryOverTime(strBuilder, localAPI, t)
+
+	if err != nil {
+		return nil, warnings, err
+	}
+
+	matrix := result.(model.Matrix)
+	return matrix, warnings, nil
 }
 
 // Gets available CPU capacity
@@ -126,6 +135,16 @@ func getNodeResourceUsageQuery(resource string, node string) (float64, promv1.Wa
 func GetPodsCPUUsage(node string) (map[string]float64, promv1.Warnings, error) {
 	resourceUsageQuery := fmt.Sprintf("sum(irate(container_cpu_usage_seconds_total{container!='POD', container!='', pod!='', instance='%s'}[5m])) by (pod)", node)
 	result, warnings, err := Query(resourceUsageQuery, localAPI)
+
+	if warnings != nil {
+		fmt.Println("Warnings when querying pod CPU usage: ", warnings)
+	}
+
+	if err != nil {
+		fmt.Println("Error when querying pod CPU usage:", err)
+		return nil, warnings, err
+	}
+
 	vector, ok := result.(model.Vector)
 
 	if !ok {
@@ -225,11 +244,11 @@ func getReplicasetToDeployment() (map[string]string, promv1.Warnings, error) {
 	vector, ok := result.(model.Vector)
 
 	if !ok {
-		return nil, nil, fmt.Errorf("Pods CPU usage query did not return a Vector.")
+		return nil, nil, fmt.Errorf("Replicaset owner usage query did not return a Vector.")
 	}
 
 	if len(vector) == 0 {
-		return nil, nil, fmt.Errorf("Pods CPU usage query returned empty result.")
+		return nil, nil, fmt.Errorf("Replicaset owner query returned empty result.")
 	}
 	resultMap := make(map[string]string)
 
@@ -258,11 +277,11 @@ func getPodsToReplicaset() (map[string]string, promv1.Warnings, error) {
 	vector, ok := result.(model.Vector)
 
 	if !ok {
-		return nil, nil, fmt.Errorf("Pods CPU usage query did not return a Vector.")
+		return nil, nil, fmt.Errorf("Pod owner query did not return a Vector.")
 	}
 
 	if len(vector) == 0 {
-		return nil, nil, fmt.Errorf("Pods CPU usage query returned empty result.")
+		return nil, nil, fmt.Errorf("Pod owner query returned empty result.")
 	}
 	resultMap := make(map[string]string)
 
@@ -326,11 +345,11 @@ func GetPodsOfNode(node string) ([]string, promv1.Warnings, error) {
 	vector, ok := result.(model.Vector)
 
 	if !ok {
-		return nil, nil, fmt.Errorf("Pods CPU usage query did not return a Vector.")
+		return nil, nil, fmt.Errorf("Pods of node query did not return a Vector.")
 	}
 
 	if len(vector) == 0 {
-		return nil, nil, fmt.Errorf("Pods CPU usage query returned empty result.")
+		return nil, nil, fmt.Errorf("Pods of node query returned empty result.")
 	}
 	//resultMap := make(map[string]string)
 	a := []string{}

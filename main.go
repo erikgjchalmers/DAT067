@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"dat067/costestimation/kubernetes"
 	"dat067/costestimation/kubernetes/azure"
@@ -141,11 +142,37 @@ func main() {
 
 	fmt.Println()
 	fmt.Println("Average CPU usage over time (in CPU cores):")
-	prometheus.GetAvgCpuUsageOverTime()
+	endTime := time.Now()
+	startTime := endTime.AddDate(0, 0, -1)
+	resolution := 1 * time.Hour
+
+	cpuUsage, warnings, err := prometheus.GetAvgCpuUsageOverTime(startTime, endTime, resolution)
+
+	if warnings != nil {
+		println("Warnings:", warnings)
+	}
+
+	if err != nil {
+		fmt.Printf("An error occured while fetching the average pod CPU usages: %s\n", err)
+		os.Exit(-1)
+	}
+
+	printMatrix(cpuUsage)
 
 	fmt.Println()
 	fmt.Println("Average mem usage over time (in bytes):")
-	prometheus.GetAvgMemUsageOverTime()
+	memUsage, warnings, err := prometheus.GetAvgMemUsageOverTime(startTime, endTime, resolution)
+
+	if warnings != nil {
+		println("Warnings:", warnings)
+	}
+
+	if err != nil {
+		fmt.Printf("An error occured while fetching the average pod RAM usages: %s\n", err)
+		os.Exit(-1)
+	}
+
+	printMatrix(memUsage)
 }
 
 func printVector(v model.Vector) {
@@ -172,7 +199,7 @@ func printMatrix(m model.Matrix) {
 	for _, sampleStream := range m {
 		fmt.Printf("Metric: %v\n", (*sampleStream).Metric.String())
 		for _, samplePair := range (*sampleStream).Values {
-			fmt.Printf("\tTime stamp; %v, value; %v\n", samplePair.Timestamp, samplePair.Value)
+			fmt.Printf("\tTime stamp; %v, value; %v\n", samplePair.Timestamp.Time(), samplePair.Value)
 		}
 	}
 }
