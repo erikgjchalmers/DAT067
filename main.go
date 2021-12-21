@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"time"
 
@@ -49,7 +50,7 @@ func main() {
 	fmt.Println()
 	fmt.Println("The price of prometheus-server during the last 24 hours is", price)
 
-	price, err = getDeploymentPrice("Does not exist", startTime, endTime)
+	//price, err = getDeploymentPrice("Does not exist", startTime, endTime)
 
 	if err != nil {
 		fmt.Println(err)
@@ -98,9 +99,11 @@ func getDeploymentPrice(deploymentName string, startTime time.Time, endTime time
 
 	resolution = time.Hour
 
-	if resolution == 0 {
-		resolution = duration
-	}
+	/*
+		if resolution == 0 {
+			resolution = duration
+		}
+	*/
 
 	//Get nodes.
 	//Get nodes cost.
@@ -108,10 +111,21 @@ func getDeploymentPrice(deploymentName string, startTime time.Time, endTime time
 
 	//Get pods
 	//Get pod resources
+
 	podPrices := make(map[string]float64)
 
 	for _, node := range pricedNodes {
 		podsResourceUsages, warnings, err := prometheus.GetAvgPodResourceUsageOverTime(node.Node.Name, startTime, endTime, resolution)
+
+		if warnings != nil {
+			fmt.Println(warnings)
+		}
+
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(-1)
+		}
+
 		for _, podsResourceUsage := range podsResourceUsages {
 			pods := podsResourceUsage.ResourceUsages
 
@@ -126,8 +140,14 @@ func getDeploymentPrice(deploymentName string, startTime time.Time, endTime time
 
 			monster := make([][]float64, len(pods))
 			index := 0
+
+			cpuUsage := 0.0
+			memUsage := 0.0
+
 			for _, resourceUsage := range pods {
 				monster[index] = []float64{resourceUsage.MemUsage, resourceUsage.CpuUsage}
+				cpuUsage += resourceUsage.CpuUsage
+				memUsage += resourceUsage.MemUsage
 				index += 1
 			}
 
@@ -136,36 +156,39 @@ func getDeploymentPrice(deploymentName string, startTime time.Time, endTime time
 			nodeMem, _, _ := prometheus.GetMemoryNodeCapacity(node.Node.Name)
 			nodeCPU, _, _ := prometheus.GetCPUNodeCapacity(node.Node.Name)
 			costCalculator := models.GoodModel{Balance: []float64{1, 1}}
-			price, _ := costCalculator.CalculateCost(
+			price, wastedCost := costCalculator.CalculateCost(
 				[]float64{
 					nodeMem,
 					nodeCPU},
 				monster,
 				node.Price, resolution.Hours())
 			index = 0
+			totalPodPrice := 0.0
 			for pod := range pods {
+				if wastedCost[index] < 0 {
+					fmt.Printf("The wasted cost for pod %s is %f\n", pod, wastedCost[index])
+				}
+
+				totalPodPrice += price[index]
 				podPrices[pod] += price[index]
 				index += 1
+			}
+
+			if cpuUsage > nodeCPU {
+				fmt.Printf("Cpu usage too high for pods on node %s\n", node.Node.Name)
+			}
+
+			if memUsage > nodeMem {
+				fmt.Printf("Mem usage too high for pods on node %s\n", node.Node.Name)
+			}
+
+			if math.Abs(totalPodPrice-resolution.Hours()*node.Price) > 1e-10 {
+				fmt.Printf("The sum of the pod prices is %f. The node price is %f\n", totalPodPrice, resolution.Hours()*node.Price)
 			}
 		}
 	}
 
-	fmt.Printf("podPrices has %d pods.\n", len(podPrices))
-
-	for pod, _ := range podPrices {
-		fmt.Println(pod)
-	}
-
-	fmt.Println()
-	fmt.Println()
-	fmt.Println()
-
 	deploymentMap := prometheus.GetPodsToDeployment(duration)
-	fmt.Printf("deploymentMap has %d pods.\n", len(deploymentMap))
-
-	for pod, _ := range deploymentMap {
-		fmt.Println(pod)
-	}
 
 	//Sum all pod costs to relevant deployment cost.
 	priceMap := make(map[string]float64)
@@ -180,9 +203,7 @@ func getDeploymentPrice(deploymentName string, startTime time.Time, endTime time
 
 		priceMap[deployment] += price
 	}
-	fmt.Println(len(priceMap))
 	//Print all the deployment costs.
-	fmt.Printf("\n")
 	for d, p := range priceMap {
 		fmt.Printf("%s has a cost of %f \n", d, p)
 	}
@@ -201,6 +222,16 @@ func getDeploymentPrice(deploymentName string, startTime time.Time, endTime time
 		sumPriceMap += v
 	}
 	fmt.Printf("Cost of nodes was %f. Total cost of pods was %f. \nThe pods being used in deployments amount to %f. \n", sumNode, sumPrice, sumPriceMap)
+	/*
+		priceDiff := math.Abs(sumNode - sumPrice)
+
+
+		for pod, price := podPrices {
+			if math.Abs(priceDiff - price) <= 1e-10 {
+				fmt.Printf("Pod %s is the culprit\n", pod)
+			}
+		}
+	*/
 	/*
 		fmt.Println()
 		fmt.Println("Average CPU usage over time (in CPU cores):")

@@ -123,53 +123,38 @@ func GetAvgPodMemUsageOverTime(node string, startTime time.Time, endTime time.Ti
 func matrixToVectorMap(matrix model.Matrix) (map[time.Time]model.Vector, error) {
 	vectorMap := make(map[time.Time]model.Vector)
 
-	metrics := []model.Metric{}
-	samplePairs := []model.SamplePair{}
-
-	sampleAmount := -1
-
 	for _, sampleStream := range matrix {
-		metrics = append(metrics, sampleStream.Metric)
-		samplePairs = append(samplePairs, sampleStream.Values...)
+		//fmt.Println(sampleStream.Metric)
 
-		fmt.Println(sampleStream.Metric)
+		for _, samplePair := range sampleStream.Values {
+			vector, ok := vectorMap[samplePair.Timestamp.Time()]
 
-		if sampleAmount == -1 {
-			sampleAmount = len(sampleStream.Values)
+			if !ok {
+				vector = []*model.Sample{}
+			}
+
+			sample := &model.Sample{
+				Metric:    sampleStream.Metric,
+				Timestamp: samplePair.Timestamp,
+				Value:     samplePair.Value,
+			}
+
+			vector = append(vector, sample)
+			vectorMap[samplePair.Timestamp.Time()] = vector
 		}
-
-		if sampleAmount != len(sampleStream.Values) {
-			return nil, fmt.Errorf("There are supposed to be %d samples for each time series. Found %d samples for the metric %s\n", sampleAmount, len(sampleStream.Values), sampleStream.Metric)
-		}
-	}
-
-	if len(samplePairs)%len(metrics) != 0 {
-		return nil, fmt.Errorf("The length of the samplePairs is not uniform across all metrics")
-	}
-
-	for i, samplePair := range samplePairs {
-		j := int(i / sampleAmount)
-
-		vector, ok := vectorMap[samplePair.Timestamp.Time()]
-
-		if !ok {
-			vector = []*model.Sample{}
-		}
-
-		sample := &model.Sample{
-			Metric:    metrics[j],
-			Timestamp: samplePair.Timestamp,
-			Value:     samplePair.Value,
-		}
-
-		vector = append(vector, sample)
-		vectorMap[samplePair.Timestamp.Time()] = vector
 	}
 
 	return vectorMap, nil
 }
 
 func GetAvgPodResourceUsageOverTime(node string, startTime time.Time, endTime time.Time, resolution time.Duration) ([]ResourceUsageSample, promv1.Warnings, error) {
+	//TODO: Is startTime before endTime?
+	duration := endTime.Sub(startTime)
+
+	if duration >= resolution {
+		endTime = endTime.Add(-resolution)
+	}
+
 	cpuUsages, cpuWarnings, cpuErrors := GetAvgPodCpuUsageOverTime(node, startTime, endTime, resolution)
 	memUsages, memWarnings, memErrors := GetAvgPodMemUsageOverTime(node, startTime, endTime, resolution)
 
@@ -191,12 +176,14 @@ func GetAvgPodResourceUsageOverTime(node string, startTime time.Time, endTime ti
 		warnings = append(warnings, memWarnings...)
 	}
 
+	//fmt.Println("Cpu query:")
 	cpuUsageVectorMap, err := matrixToVectorMap(cpuUsages)
 
 	if err != nil {
 		return nil, warnings, err
 	}
 
+	//fmt.Println("Mem query:")
 	memUsageVectorMap, err := matrixToVectorMap(memUsages)
 
 	if err != nil {
