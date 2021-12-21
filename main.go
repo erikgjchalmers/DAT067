@@ -9,12 +9,55 @@ import (
 	"dat067/costestimation/kubernetes/azure"
 	"dat067/costestimation/models"
 	"dat067/costestimation/prometheus"
+	officialkube "k8s.io/client-go/kubernetes"
 
 	//model shouldn't be needed after test printing functionality removed.
 	"github.com/prometheus/common/model"
 )
 
+var clientSet *officialkube.Clientset
+var pricedNodes []kubernetes.PricedNode
+
 func main() {
+	endTime := time.Now()
+	startTime := endTime.Add(-24 * time.Hour)
+
+	var err error
+	clientSet, err = kubernetes.CreateClientSet()
+
+	if err != nil {
+		fmt.Errorf("An error occured when creating the Kubernetes client: '%v'", err)
+		os.Exit(-1)
+	}
+
+	pricedNodes, err = azure.GetPricedAzureNodes(clientSet)
+
+	if err != nil {
+		fmt.Errorf("An error occured while retrieving Azure node prices: '%v'", err)
+		os.Exit(-1)
+	}
+
+	price, err := getDeploymentPrice("prometheus-server", startTime, endTime)
+
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(-1)
+	}
+
+	fmt.Println()
+	fmt.Println()
+	fmt.Println()
+	fmt.Println("The price of prometheus-server during the last 24 hours is", price)
+
+	price, err = getDeploymentPrice("Does not exist", startTime, endTime)
+
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(-1)
+	}
+}
+
+func getDeploymentPrice(deploymentName string, startTime time.Time, endTime time.Time) (float64, error) {
 	/*
 	 * The following code queries Prometheus on localhost using the simple "up" query.
 	 */
@@ -48,18 +91,15 @@ func main() {
 	   		os.Exit(1)
 	   	} */
 
-	clientSet, err := kubernetes.CreateClientSet()
+	duration := endTime.Sub(startTime)
+	durationHours := duration.Hours()
 
-	if err != nil {
-		fmt.Printf("An error occured when creating the Kubernetes client: '%v'", err)
-		return
-	}
+	var resolution time.Duration = 0
 
-	pricedNodes, err := azure.GetPricedAzureNodes(clientSet)
+	resolution = time.Hour
 
-	if err != nil {
-		fmt.Printf("An error occured while retrieving Azure node prices: '%v'", err)
-		return
+	if resolution == 0 {
+		resolution = duration
 	}
 
 	//Get nodes.
@@ -69,50 +109,72 @@ func main() {
 	//Get pods
 	//Get pod resources
 	podPrices := make(map[string]float64)
+
 	for _, node := range pricedNodes {
-		pods, warnings, err := prometheus.GetPodsResourceUsage(node.Node.Name)
+		podsResourceUsages, warnings, err := prometheus.GetAvgPodResourceUsageOverTime(node.Node.Name, startTime, endTime, resolution)
+		for _, podsResourceUsage := range podsResourceUsages {
+			pods := podsResourceUsage.ResourceUsages
 
-		if err != nil {
-			fmt.Printf("An error occured when querying Prometheus: %v\n", err)
-			os.Exit(1)
-		}
+			if err != nil {
+				fmt.Printf("An error occured when querying Prometheus: %v\n", err)
+				os.Exit(1)
+			}
 
-		if len(warnings) > 0 {
-			fmt.Printf("Warnings during query: %v\n", warnings)
-		}
+			if len(warnings) > 0 {
+				fmt.Printf("Warnings during query: %v\n", warnings)
+			}
 
-		monster := make([][]float64, len(pods))
-		index := 0
-		for _, resourceUsage := range pods {
-			monster[index] = []float64{resourceUsage.MemUsage, resourceUsage.CpuUsage}
-			index += 1
-		}
+			monster := make([][]float64, len(pods))
+			index := 0
+			for _, resourceUsage := range pods {
+				monster[index] = []float64{resourceUsage.MemUsage, resourceUsage.CpuUsage}
+				index += 1
+			}
 
-		//TODO: We get all the pods on a node, even those not belonging to a deployment.
-		//Calculate pods' cost
-		nodeMem, _, _ := prometheus.GetMemoryNodeCapacity(node.Node.Name)
-		nodeCPU, _, _ := prometheus.GetCPUNodeCapacity(node.Node.Name)
-		costCalculator := models.GoodModel{Balance: []float64{1, 1}}
-		price, _ := costCalculator.CalculateCost(
-			[]float64{
-				nodeMem,
-				nodeCPU},
-			monster,
-			node.Price, 1)
-		index = 0
-		for pod := range pods {
-			podPrices[pod] = price[index]
-			index += 1
+			//TODO: We get all the pods on a node, even those not belonging to a deployment.
+			//Calculate pods' cost
+			nodeMem, _, _ := prometheus.GetMemoryNodeCapacity(node.Node.Name)
+			nodeCPU, _, _ := prometheus.GetCPUNodeCapacity(node.Node.Name)
+			costCalculator := models.GoodModel{Balance: []float64{1, 1}}
+			price, _ := costCalculator.CalculateCost(
+				[]float64{
+					nodeMem,
+					nodeCPU},
+				monster,
+				node.Price, resolution.Hours())
+			index = 0
+			for pod := range pods {
+				podPrices[pod] += price[index]
+				index += 1
+			}
 		}
 	}
-	deploymentMap := prometheus.GetPodsToDeployment()
+
+	fmt.Printf("podPrices has %d pods.\n", len(podPrices))
+
+	for pod, _ := range podPrices {
+		fmt.Println(pod)
+	}
+
+	fmt.Println()
+	fmt.Println()
+	fmt.Println()
+
+	deploymentMap := prometheus.GetPodsToDeployment(duration)
+	fmt.Printf("deploymentMap has %d pods.\n", len(deploymentMap))
+
+	for pod, _ := range deploymentMap {
+		fmt.Println(pod)
+	}
+
 	//Sum all pod costs to relevant deployment cost.
 	priceMap := make(map[string]float64)
 
 	for pod, deployment := range deploymentMap {
 		price, ok := podPrices[pod]
 		if !ok {
-			fmt.Print("NOT OK!")
+			fmt.Println("NOT OK!")
+			fmt.Printf("The pod '%s' does not exist in podPrices\n", pod)
 			continue
 		}
 
@@ -127,8 +189,8 @@ func main() {
 	fmt.Printf("\nNode prices: \n")
 	sumNode := 0.0
 	for _, node := range pricedNodes {
-		fmt.Printf("Node %s costs %f.\n", node.Node.Name, node.Price)
-		sumNode += node.Price
+		fmt.Printf("Node %s costs %f.\n", node.Node.Name, durationHours*node.Price)
+		sumNode += durationHours * node.Price
 	}
 	sumPrice := 0.0
 	for _, v := range podPrices {
@@ -139,40 +201,49 @@ func main() {
 		sumPriceMap += v
 	}
 	fmt.Printf("Cost of nodes was %f. Total cost of pods was %f. \nThe pods being used in deployments amount to %f. \n", sumNode, sumPrice, sumPriceMap)
+	/*
+		fmt.Println()
+		fmt.Println("Average CPU usage over time (in CPU cores):")
+		endTime := time.Now()
+		startTime := endTime.AddDate(0, 0, -1)
+		resolution := 1 * time.Hour
 
-	fmt.Println()
-	fmt.Println("Average CPU usage over time (in CPU cores):")
-	endTime := time.Now()
-	startTime := endTime.AddDate(0, 0, -1)
-	resolution := 1 * time.Hour
 
-	cpuUsage, warnings, err := prometheus.GetAvgCpuUsageOverTime(startTime, endTime, resolution)
+		cpuUsage, warnings, err := prometheus.GetAvgCpuUsageOverTime(startTime, endTime, resolution)
 
-	if warnings != nil {
-		println("Warnings:", warnings)
+		if warnings != nil {
+			println("Warnings:", warnings)
+		}
+
+		if err != nil {
+			fmt.Printf("An error occured while fetching the average pod CPU usages: %s\n", err)
+			os.Exit(-1)
+		}
+
+		printMatrix(cpuUsage)
+
+		fmt.Println()
+		fmt.Println("Average mem usage over time (in bytes):")
+		memUsage, warnings, err := prometheus.GetAvgMemUsageOverTime(startTime, endTime, resolution)
+
+		if warnings != nil {
+			println("Warnings:", warnings)
+		}
+
+		if err != nil {
+			fmt.Printf("An error occured while fetching the average pod RAM usages: %s\n", err)
+			os.Exit(-1)
+		}
+
+		printMatrix(memUsage)*/
+
+	returnPrice, ok := priceMap[deploymentName]
+
+	if !ok {
+		return -1, fmt.Errorf("The name '%s' is not a valid deployment\n", deploymentName)
 	}
 
-	if err != nil {
-		fmt.Printf("An error occured while fetching the average pod CPU usages: %s\n", err)
-		os.Exit(-1)
-	}
-
-	printMatrix(cpuUsage)
-
-	fmt.Println()
-	fmt.Println("Average mem usage over time (in bytes):")
-	memUsage, warnings, err := prometheus.GetAvgMemUsageOverTime(startTime, endTime, resolution)
-
-	if warnings != nil {
-		println("Warnings:", warnings)
-	}
-
-	if err != nil {
-		fmt.Printf("An error occured while fetching the average pod RAM usages: %s\n", err)
-		os.Exit(-1)
-	}
-
-	printMatrix(memUsage)
+	return returnPrice, nil
 }
 
 func printVector(v model.Vector) {
