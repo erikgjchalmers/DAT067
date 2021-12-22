@@ -7,11 +7,15 @@ import (
 	"time"
 
 	"dat067/costestimation/kubernetes"
-	"dat067/costestimation/kubernetes/azure"
 	"dat067/costestimation/models"
+	//"dat067/costestimation/models"
 	"dat067/costestimation/prometheus"
+	"net/http"
+
 	officialkube "k8s.io/client-go/kubernetes"
 
+	//http
+	"github.com/gin-gonic/gin"
 	//model shouldn't be needed after test printing functionality removed.
 	"github.com/prometheus/common/model"
 )
@@ -20,23 +24,29 @@ var clientSet *officialkube.Clientset
 var pricedNodes []kubernetes.PricedNode
 
 func main() {
+
+	router := gin.Default()
+	router.GET("/price", getDeploymentPrices)
+
 	endTime := time.Now()
 	startTime := endTime.Add(-24 * time.Hour)
 
 	var err error
-	clientSet, err = kubernetes.CreateClientSet()
+	/*clientSet, err = kubernetes.CreateClientSet()
 
 	if err != nil {
 		fmt.Errorf("An error occured when creating the Kubernetes client: '%v'", err)
 		os.Exit(-1)
 	}
 
-	pricedNodes, err = azure.GetPricedAzureNodes(clientSet)
+	pricedNodes, err = azure.GetPricedAzureNodes(clientSet)*/
 
 	if err != nil {
 		fmt.Errorf("An error occured while retrieving Azure node prices: '%v'", err)
 		os.Exit(-1)
 	}
+
+	router.Run()
 
 	price, err := getDeploymentPrice("prometheus-server", startTime, endTime)
 
@@ -56,6 +66,11 @@ func main() {
 		fmt.Println(err)
 		os.Exit(-1)
 	}
+}
+
+func getDeploymentPrices(c *gin.Context) {
+	c.String(http.StatusOK, "Hello")
+
 }
 
 func getDeploymentPrice(deploymentName string, startTime time.Time, endTime time.Time) (float64, error) {
