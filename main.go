@@ -9,6 +9,7 @@ import (
 	"dat067/costestimation/kubernetes"
 	"dat067/costestimation/kubernetes/azure"
 	"dat067/costestimation/models"
+
 	//"dat067/costestimation/models"
 	"dat067/costestimation/prometheus"
 	"net/http"
@@ -24,13 +25,18 @@ import (
 var clientSet *officialkube.Clientset
 var pricedNodes []kubernetes.PricedNode
 
+type ResponseItem struct {
+	Price          float64 `json:"price"`
+	DeploymentName string  `json:"deployment"`
+}
+
 func main() {
 
-	//router := gin.Default()
-	//router.GET("/price", getDeploymentPrices)
+	router := gin.Default()
+	router.GET("/price", getDeploymentPrices)
 
-	endTime := time.Now()
-	startTime := endTime.Add(-time.Hour)
+	//endTime := time.Now()
+	//startTime := endTime.Add(-time.Hour)
 
 	var err error
 	clientSet, err = kubernetes.CreateClientSet()
@@ -47,9 +53,9 @@ func main() {
 		os.Exit(-1)
 	}
 
-	//	router.Run()
+	router.Run()
 
-	price, err := getDeploymentPrice("prometheus-server", startTime, endTime)
+	/*price, err := getDeploymentPrice("prometheus-server", startTime, endTime)
 
 	if err != nil {
 		fmt.Println(err)
@@ -66,15 +72,33 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(-1)
-	}
+	}*/
 }
 
 func getDeploymentPrices(c *gin.Context) {
-	c.String(http.StatusOK, "Hello")
+	endTime := time.Now()
+	startTime := endTime.Add(-time.Hour)
+	pricedMap, err := getDeploymentPrice(startTime, endTime)
+	if err != nil {
+		c.String(http.StatusInternalServerError, err.Error())
+	}
+	priceArray := make([]ResponseItem, len(pricedMap))
+	index := 0
+	for deployment, price := range pricedMap {
+
+		priceInfoStruct := ResponseItem{
+			Price:          price,
+			DeploymentName: deployment,
+		}
+		priceArray[index] = priceInfoStruct
+		index++
+
+	}
+	c.JSON(http.StatusOK, priceArray)
 
 }
 
-func getDeploymentPrice(deploymentName string, startTime time.Time, endTime time.Time) (float64, error) {
+func getDeploymentPrice(startTime time.Time, endTime time.Time) (map[string]float64, error) {
 	/*
 	 * The following code queries Prometheus on localhost using the simple "up" query.
 	 */
@@ -285,13 +309,7 @@ func getDeploymentPrice(deploymentName string, startTime time.Time, endTime time
 
 		printMatrix(memUsage)*/
 
-	returnPrice, ok := priceMap[deploymentName]
-
-	if !ok {
-		return -1, fmt.Errorf("The name '%s' is not a valid deployment\n", deploymentName)
-	}
-
-	return returnPrice, nil
+	return priceMap, nil
 }
 
 func printVector(v model.Vector) {
