@@ -126,6 +126,8 @@ func matrixToVectorMap(matrix model.Matrix) (map[time.Time]model.Vector, error) 
 	for _, sampleStream := range matrix {
 		//fmt.Println(sampleStream.Metric)
 
+		fmt.Println(sampleStream.Metric)
+
 		for _, samplePair := range sampleStream.Values {
 			vector, ok := vectorMap[samplePair.Timestamp.Time()]
 
@@ -219,7 +221,7 @@ func GetAvgPodResourceUsageOverTime(node string, startTime time.Time, endTime ti
 
 // Gets available CPU capacity
 func GetCPUNodeCapacity(node string) (float64, promv1.Warnings, error) {
-	strBuilder := fmt.Sprintf("kube_node_status_capacity{resource='cpu', exported_node='%s'}", node)
+	strBuilder := fmt.Sprintf("kube_node_status_capacity{resource='cpu', node='%s'}", node)
 	result, warnings, err := Query(strBuilder, localAPI, time.Now())
 	vector := result.(model.Vector)
 	sample := vector[0]
@@ -229,7 +231,7 @@ func GetCPUNodeCapacity(node string) (float64, promv1.Warnings, error) {
 }
 
 func GetMemoryNodeCapacity(node string) (float64, promv1.Warnings, error) {
-	strBuilder := fmt.Sprintf("kube_node_status_capacity{resource='memory', exported_node='%s'}", node)
+	strBuilder := fmt.Sprintf("kube_node_status_capacity{resource='memory', node='%s'}", node)
 	result, warnings, err := Query(strBuilder, localAPI, time.Now())
 	vector := result.(model.Vector)
 	sample := vector[0]
@@ -247,7 +249,7 @@ func GetMemoryNodeUsage(node string) (float64, promv1.Warnings, error) {
 }
 
 func getNodeResourceUsageQuery(resource string, node string) (float64, promv1.Warnings, error) {
-	resourceUsageQuery := fmt.Sprintf("kube_node_status_capacity{resource='%s', exported_node='%s'} - avg_over_time(kube_node_status_allocatable{resource='%s', exported_node='%s'}[1h])", resource, node, resource, node)
+	resourceUsageQuery := fmt.Sprintf("kube_node_status_capacity{resource='%s', node='%s'} - avg_over_time(kube_node_status_allocatable{resource='%s', node='%s'}[1h])", resource, node, resource, node)
 	result, warnings, err := Query(resourceUsageQuery, localAPI, time.Now())
 	vector := result.(model.Vector)
 	sample := vector[0]
@@ -489,7 +491,7 @@ func GetPodsToDeployment(duration time.Duration) map[string]string {
 *
  */
 func GetPodsOfNode(node string, duration time.Duration) ([]string, promv1.Warnings, error) {
-	strBuilder := fmt.Sprintf("count_over_time(kube_pod_info{exported_node='%s'}[%s])", node, duration)
+	strBuilder := fmt.Sprintf("count_over_time(kube_pod_info{node='%s'}[%s])", node, duration)
 	result, warnings, err := Query(strBuilder, localAPI, time.Now())
 
 	vector, ok := result.(model.Vector)

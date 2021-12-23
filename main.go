@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"dat067/costestimation/kubernetes"
+	"dat067/costestimation/kubernetes/azure"
 	"dat067/costestimation/models"
 	//"dat067/costestimation/models"
 	"dat067/costestimation/prometheus"
@@ -25,28 +26,28 @@ var pricedNodes []kubernetes.PricedNode
 
 func main() {
 
-	router := gin.Default()
-	router.GET("/price", getDeploymentPrices)
+	//router := gin.Default()
+	//router.GET("/price", getDeploymentPrices)
 
 	endTime := time.Now()
-	startTime := endTime.Add(-24 * time.Hour)
+	startTime := endTime.Add(-time.Hour)
 
 	var err error
-	/*clientSet, err = kubernetes.CreateClientSet()
+	clientSet, err = kubernetes.CreateClientSet()
 
 	if err != nil {
 		fmt.Errorf("An error occured when creating the Kubernetes client: '%v'", err)
 		os.Exit(-1)
 	}
 
-	pricedNodes, err = azure.GetPricedAzureNodes(clientSet)*/
+	pricedNodes, err = azure.GetPricedAzureNodes(clientSet)
 
 	if err != nil {
 		fmt.Errorf("An error occured while retrieving Azure node prices: '%v'", err)
 		os.Exit(-1)
 	}
 
-	router.Run()
+	//	router.Run()
 
 	price, err := getDeploymentPrice("prometheus-server", startTime, endTime)
 
@@ -112,7 +113,7 @@ func getDeploymentPrice(deploymentName string, startTime time.Time, endTime time
 
 	var resolution time.Duration = 0
 
-	resolution = time.Hour
+	resolution = 5 * time.Minute
 
 	/*
 		if resolution == 0 {
@@ -159,7 +160,8 @@ func getDeploymentPrice(deploymentName string, startTime time.Time, endTime time
 			cpuUsage := 0.0
 			memUsage := 0.0
 
-			for _, resourceUsage := range pods {
+			for pod, resourceUsage := range pods {
+				fmt.Println(pod)
 				monster[index] = []float64{resourceUsage.MemUsage, resourceUsage.CpuUsage}
 				cpuUsage += resourceUsage.CpuUsage
 				memUsage += resourceUsage.MemUsage
