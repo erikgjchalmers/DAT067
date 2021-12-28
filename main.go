@@ -31,9 +31,13 @@ type ResponseItem struct {
 }
 
 func main() {
-
+	now := time.Now()
+	fmt.Print("NOW")
+	fmt.Print(now)
+	fmt.Print("NOW")
 	router := gin.Default()
-	router.GET("/price", getDeploymentPrices)
+	//router.GET("/price", getDeploymentPrices)
+	router.GET("/price/:deployment", getDeploymentPrices)
 
 	//endTime := time.Now()
 	//startTime := endTime.Add(-time.Hour)
@@ -76,8 +80,31 @@ func main() {
 }
 
 func getDeploymentPrices(c *gin.Context) {
-	endTime := time.Now()
-	startTime := endTime.Add(-time.Hour)
+	wantedDeployment := c.Param("deployment")
+	//endTime := time.Now()
+	//startTime := endTime.Add(-time.Hour)
+	// in postman URL: http://localhost:8080/price/coredns-autoscaler?startTime=2021-12-24T00:00:00.371Z&endTime=2021-12-25T00:00:00.371Z
+	endTimeStr := c.Query("endTime")
+	fmt.Print("End")
+	fmt.Print(endTimeStr)
+	startTimeStr := c.Query("startTime")
+	fmt.Print(startTimeStr)
+	layout := "2006-01-02T15:04:05.000Z"
+	fmt.Print("Start")
+	fmt.Print(startTimeStr)
+	fmt.Print("End")
+	fmt.Print(endTimeStr)
+	endTime, err := time.Parse(layout, endTimeStr)
+	if err != nil {
+		fmt.Print("ERROR")
+		fmt.Print(err.Error())
+	}
+	startTime, err := time.Parse(layout, startTimeStr)
+	if err != nil {
+		fmt.Print("ERROR")
+		fmt.Print(err.Error())
+	}
+
 	pricedMap, err := getDeploymentPrice(startTime, endTime)
 	if err != nil {
 		c.String(http.StatusInternalServerError, err.Error())
@@ -94,7 +121,11 @@ func getDeploymentPrices(c *gin.Context) {
 		index++
 
 	}
-	c.JSON(http.StatusOK, priceArray)
+	for i, s := range priceArray {
+		if s.DeploymentName == wantedDeployment {
+			c.JSON(http.StatusOK, priceArray[i])
+		}
+	}
 
 }
 
