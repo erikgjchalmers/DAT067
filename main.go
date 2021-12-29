@@ -54,18 +54,56 @@ func main() {
 		os.Exit(-1)
 	}
 
-	//Testing stuff
+	address := "http://localhost:9090"
+	prometheus.CreateAPI(address)
+
+	//Testing stuff related to getDeploymentPrice
 	/*
 		testEndTime := time.Now()
-		testDuration := 24*time.Hour
-		testStartTime :=  testEndTime.Add(-testDuration)
+		testDuration := 24 * time.Hour
+		testStartTime := testEndTime.Add(-testDuration)
 		testResult, _, _ := prometheus.GetAvgPodResourceUsageOverTime("aks-default-15038067-vmss000000", testStartTime, testEndTime, testDuration)
-		testResultTwo , _, _ := prometheus.GetAvgPodResourceUsageOverTime("aks-default-15038067-vmss000000", testStartTime, testEndTime, testDuration)
+		nodeCPUTest, _, _ := prometheus.GetCPUNodeCapacity("aks-default-15038067-vmss000000", testStartTime)
+		nodeRAMTest, _, _ := prometheus.GetMemoryNodeCapacity("aks-default-15038067-vmss000000", testStartTime)
+		deploymentTest, _, pricesOfPods := getDeploymentPrice(testStartTime, testEndTime, testDuration)
+		podToDeploymentTest := prometheus.GetPodsToDeployment(testEndTime, testDuration)
+		time.Sleep(1 * time.Second)
+		nodeCPUTest2, _, _ := prometheus.GetCPUNodeCapacity("aks-default-15038067-vmss000000", testStartTime)
+		nodeRAMTest2, _, _ := prometheus.GetMemoryNodeCapacity("aks-default-15038067-vmss000000", testStartTime)
+		testResultTwo, _, _ := prometheus.GetAvgPodResourceUsageOverTime("aks-default-15038067-vmss000000", testStartTime, testEndTime, testDuration)
+		deploymentTestTwo, _, pricesOfPods2 := getDeploymentPrice(testStartTime, testEndTime, testDuration)
+		podToDeploymentTestTwo := prometheus.GetPodsToDeployment(testEndTime, testDuration)
 
-		for i, pod := range testResult{
+		fmt.Printf("\n Nodes: \n First{%f, %f} Second: {%f, %f}\n", nodeCPUTest, nodeRAMTest, nodeCPUTest2, nodeRAMTest2)
+
+		fmt.Printf("Amount of time points: First: {%d}, Second {%d}\n", len(testResult), len(testResultTwo))
+		for i, pod := range testResult {
 			pod2 := testResultTwo[i]
-			fmt.Printf(""pod)
+			fmt.Printf("Length of podsUsages: First: {%d}, Second {%d}\n", len(pod.ResourceUsages), len(pod2.ResourceUsages))
+			for k, v := range pod.ResourceUsages {
+				fmt.Printf("First{%f, %f} Second: {%f, %f}\n", v.CpuUsage, v.MemUsage, pod2.ResourceUsages[k].CpuUsage, pod2.ResourceUsages[k].MemUsage)
+			}
+
 		}
+
+		fmt.Printf("Length of deployment: First: {%d}, Second {%d}\n", len(deploymentTest), len(deploymentTestTwo))
+		for k, v := range deploymentTest {
+			pod2 := deploymentTestTwo[k]
+			fmt.Printf("First{%f} Second: {%f}\n", v, pod2)
+		}
+
+		fmt.Printf("Length of podToDeploments: First: {%d}, Second {%d}\n", len(podToDeploymentTest), len(podToDeploymentTestTwo))
+		for k, v := range podToDeploymentTest {
+			pod2 := podToDeploymentTestTwo[k]
+			fmt.Printf("First{%s} Second: {%s}\n", v, pod2)
+		}
+
+		fmt.Printf("Length of podPrices: First: {%d}, Second {%d}\n", len(pricesOfPods), len(pricesOfPods2))
+		for k, v := range pricesOfPods {
+			pod2 := pricesOfPods2[k]
+			fmt.Printf("First{%f} Second: {%f}\n", v, pod2)
+		}
+		//End of things testing getDeploymentPrice
 	*/
 	router.Run()
 
@@ -150,9 +188,6 @@ func getDeploymentPrice(startTime time.Time, endTime time.Time, resolution time.
 	/*
 	 * The following code queries Prometheus on localhost using the simple "up" query.
 	 */
-	address := "http://localhost:9090"
-	//query := "up"
-	prometheus.CreateAPI(address)
 
 	/* 	switch result.Type() {
 	   	case model.ValVector:
@@ -231,8 +266,9 @@ func getDeploymentPrice(startTime time.Time, endTime time.Time, resolution time.
 
 			cpuUsage := 0.0
 			memUsage := 0.0
-
-			for _, resourceUsage := range pods {
+			orderOfNames := make([]string, len(pods))
+			for name, resourceUsage := range pods {
+				orderOfNames[index] = name
 				monster[index] = []float64{resourceUsage.MemUsage, resourceUsage.CpuUsage}
 				cpuUsage += resourceUsage.CpuUsage
 				memUsage += resourceUsage.MemUsage
@@ -252,7 +288,7 @@ func getDeploymentPrice(startTime time.Time, endTime time.Time, resolution time.
 				node.Price, resolution.Hours())
 			index = 0
 			totalPodPrice := 0.0
-			for pod := range pods {
+			for _, pod := range orderOfNames {
 				if wastedCost[index] < 0 {
 					fmt.Printf("The wasted cost for pod %s is %f\n", pod, wastedCost[index])
 				}
