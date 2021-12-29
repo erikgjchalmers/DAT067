@@ -31,10 +31,7 @@ type ResponseItem struct {
 }
 
 func main() {
-	now := time.Now()
-	fmt.Print("NOW")
-	fmt.Print(now)
-	fmt.Print("NOW")
+
 	router := gin.Default()
 	//router.GET("/price", getDeploymentPrices)
 	router.GET("/price/:deployment", getDeploymentPrices)
@@ -124,8 +121,12 @@ func getDeploymentPrices(c *gin.Context) {
 	for i, s := range priceArray {
 		if s.DeploymentName == wantedDeployment {
 			c.JSON(http.StatusOK, priceArray[i])
+			return
 		}
+
+		//couldn't find deployment-name add message
 	}
+	c.JSON(http.StatusNotFound, "deployment not found")
 
 }
 
@@ -168,7 +169,7 @@ func getDeploymentPrice(startTime time.Time, endTime time.Time) (map[string]floa
 
 	var resolution time.Duration = 0
 
-	resolution = 5 * time.Minute
+	resolution = 1 * time.Hour
 
 	/*
 		if resolution == 0 {
@@ -199,7 +200,7 @@ func getDeploymentPrice(startTime time.Time, endTime time.Time) (map[string]floa
 
 		for _, podsResourceUsage := range podsResourceUsages {
 			pods := podsResourceUsage.ResourceUsages
-
+			t := podsResourceUsage.Time
 			if err != nil {
 				fmt.Printf("An error occured when querying Prometheus: %v\n", err)
 				os.Exit(1)
@@ -215,8 +216,7 @@ func getDeploymentPrice(startTime time.Time, endTime time.Time) (map[string]floa
 			cpuUsage := 0.0
 			memUsage := 0.0
 
-			for pod, resourceUsage := range pods {
-				fmt.Println(pod)
+			for _, resourceUsage := range pods {
 				monster[index] = []float64{resourceUsage.MemUsage, resourceUsage.CpuUsage}
 				cpuUsage += resourceUsage.CpuUsage
 				memUsage += resourceUsage.MemUsage
@@ -225,8 +225,8 @@ func getDeploymentPrice(startTime time.Time, endTime time.Time) (map[string]floa
 
 			//TODO: We get all the pods on a node, even those not belonging to a deployment.
 			//Calculate pods' cost
-			nodeMem, _, _ := prometheus.GetMemoryNodeCapacity(node.Node.Name)
-			nodeCPU, _, _ := prometheus.GetCPUNodeCapacity(node.Node.Name)
+			nodeMem, _, _ := prometheus.GetMemoryNodeCapacity(node.Node.Name, t)
+			nodeCPU, _, _ := prometheus.GetCPUNodeCapacity(node.Node.Name, t)
 			costCalculator := models.GoodModel{Balance: []float64{1, 1}}
 			price, wastedCost := costCalculator.CalculateCost(
 				[]float64{
