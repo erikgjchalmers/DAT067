@@ -155,7 +155,7 @@ func getDeploymentPrices(c *gin.Context) {
 		os.Exit(-1)
 	}
 
-	pricedMap, err, _ := getDeploymentPrice(startTime, endTime, endTime.Sub(startTime))
+	pricedMap, err := getDeploymentPrice(startTime, endTime, endTime.Sub(startTime))
 	if err != nil {
 		c.String(http.StatusInternalServerError, err.Error())
 	}
@@ -184,7 +184,7 @@ func getDeploymentPrices(c *gin.Context) {
 
 }
 
-func getDeploymentPrice(startTime time.Time, endTime time.Time, resolution time.Duration) (map[string]float64, error, map[string]float64) {
+func getDeploymentPrice(startTime time.Time, endTime time.Time, resolution time.Duration) (map[string]float64, error) {
 	/*
 	 * The following code queries Prometheus on localhost using the simple "up" query.
 	 */
@@ -311,7 +311,7 @@ func getDeploymentPrice(startTime time.Time, endTime time.Time, resolution time.
 			}
 		}
 	}
-	fmt.Printf("Internal to getDeploymentPrice, length of podPrices: %d\n", len(podPrices))
+
 	deploymentMap := prometheus.GetPodsToDeployment(endTime, duration)
 
 	//Sum all pod costs to relevant deployment cost.
@@ -392,7 +392,7 @@ func getDeploymentPrice(startTime time.Time, endTime time.Time, resolution time.
 
 		printMatrix(memUsage)*/
 
-	return priceMap, nil, podPrices
+	return priceMap, nil
 }
 
 func printVector(v model.Vector) {
