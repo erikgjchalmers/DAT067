@@ -260,7 +260,7 @@ func getDeploymentPrice(startTime time.Time, endTime time.Time) (map[string]floa
 		}
 	}
 
-	deploymentMap := prometheus.GetPodsToDeployment(duration)
+	deploymentMap := prometheus.GetPodsToDeployment(t, duration)
 
 	//Sum all pod costs to relevant deployment cost.
 	priceMap := make(map[string]float64)
