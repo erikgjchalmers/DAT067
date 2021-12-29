@@ -54,6 +54,19 @@ func main() {
 		os.Exit(-1)
 	}
 
+	//Testing stuff
+	/*
+		testEndTime := time.Now()
+		testDuration := 24*time.Hour
+		testStartTime :=  testEndTime.Add(-testDuration)
+		testResult, _, _ := prometheus.GetAvgPodResourceUsageOverTime("aks-default-15038067-vmss000000", testStartTime, testEndTime, testDuration)
+		testResultTwo , _, _ := prometheus.GetAvgPodResourceUsageOverTime("aks-default-15038067-vmss000000", testStartTime, testEndTime, testDuration)
+
+		for i, pod := range testResult{
+			pod2 := testResultTwo[i]
+			fmt.Printf(""pod)
+		}
+	*/
 	router.Run()
 
 	/*price, err := getDeploymentPrice("prometheus-server", startTime, endTime)
@@ -95,17 +108,20 @@ func getDeploymentPrices(c *gin.Context) {
 	if err != nil {
 		fmt.Print("ERROR")
 		fmt.Print(err.Error())
+		os.Exit(-1)
 	}
 	startTime, err := time.Parse(layout, startTimeStr)
 	if err != nil {
 		fmt.Print("ERROR")
 		fmt.Print(err.Error())
+		os.Exit(-1)
 	}
 
-	pricedMap, err := getDeploymentPrice(startTime, endTime)
+	pricedMap, err := getDeploymentPrice(startTime, endTime, endTime.Sub(startTime))
 	if err != nil {
 		c.String(http.StatusInternalServerError, err.Error())
 	}
+
 	priceArray := make([]ResponseItem, len(pricedMap))
 	index := 0
 	for deployment, price := range pricedMap {
@@ -130,7 +146,7 @@ func getDeploymentPrices(c *gin.Context) {
 
 }
 
-func getDeploymentPrice(startTime time.Time, endTime time.Time) (map[string]float64, error) {
+func getDeploymentPrice(startTime time.Time, endTime time.Time, resolution time.Duration) (map[string]float64, error) {
 	/*
 	 * The following code queries Prometheus on localhost using the simple "up" query.
 	 */
@@ -166,11 +182,11 @@ func getDeploymentPrice(startTime time.Time, endTime time.Time) (map[string]floa
 
 	duration := endTime.Sub(startTime)
 	durationHours := duration.Hours()
+	/*
+		var resolution time.Duration = 0
 
-	var resolution time.Duration = 0
-
-	resolution = 1 * time.Hour
-
+		resolution = 1 * time.Hour
+	*/
 	/*
 		if resolution == 0 {
 			resolution = duration
@@ -260,7 +276,7 @@ func getDeploymentPrice(startTime time.Time, endTime time.Time) (map[string]floa
 		}
 	}
 
-	deploymentMap := prometheus.GetPodsToDeployment(t, duration)
+	deploymentMap := prometheus.GetPodsToDeployment(endTime, duration)
 
 	//Sum all pod costs to relevant deployment cost.
 	priceMap := make(map[string]float64)

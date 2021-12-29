@@ -126,7 +126,7 @@ func matrixToVectorMap(matrix model.Matrix) (map[time.Time]model.Vector, error) 
 	for _, sampleStream := range matrix {
 		//fmt.Println(sampleStream.Metric)
 
-		fmt.Println(sampleStream.Metric)
+		//fmt.Println(sampleStream.Metric)
 
 		for _, samplePair := range sampleStream.Values {
 			vector, ok := vectorMap[samplePair.Timestamp.Time()]
