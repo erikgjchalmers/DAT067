@@ -100,3 +100,11 @@ func TestGoodModel(t *testing.T) {
 	}
 	assert.InDelta(t, 200, sum, epsilon)
 }
+
+func TestCostWithoutWaste(t *testing.T) {
+	m := CostWithoutWaste{[]float64{1, 1}}
+	var prices []float64
+	prices, _ = m.CalculateCost([]float64{100, 100}, [][]float64{{25, 25}, {25, 25}}, 100, 1)
+	assert.InDelta(t, 50, prices[0], epsilon)
+
+}
