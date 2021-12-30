@@ -12,6 +12,70 @@ type ICostCalculator interface {
 //A way to enforce the use of interface. Will give an error when compiling if interface is not implemented on the models.
 var _ ICostCalculator = (*BadModel)(nil)
 var _ ICostCalculator = (*GoodModel)(nil)
+var _ ICostCalculator = (*CostWithoutWaste)(nil)
+
+type CostWithoutWaste struct {
+	Balance []float64
+}
+
+func (m CostWithoutWaste) CalculateCost(nodeResources []float64, usagePerContainer [][]float64, nodePrice float64, hours float64) ([]float64, []float64) {
+	//Make sure that Balance is normalized(Is there a way to do this on model declaration?)
+	if m.Balance == nil {
+		m.Balance = make([]float64, len(nodeResources))
+	}
+	m.Balance = normalizeSlice(m.Balance)
+
+	//Making a new array to store the data.
+	percentUsePerContainer := make([][]float64, len(usagePerContainer))
+	for i := range percentUsePerContainer {
+		percentUsePerContainer[i] = make([]float64, len(nodeResources))
+	}
+
+	//Converting the usage array to percentage and storing in new array.
+	for i := range usagePerContainer {
+		for j, v := range usagePerContainer[i] {
+			percentUsePerContainer[i][j] = v / nodeResources[j]
+		}
+	}
+
+	wastedResources := make([]float64, len(nodeResources))
+	totalUseOfResource := make([]float64, len(nodeResources))
+	//For each resource
+	for i := range nodeResources {
+		//For each container
+		for j := range percentUsePerContainer {
+			totalUseOfResource[i] += percentUsePerContainer[j][i]
+		}
+		wastedResources[i] = 1 - totalUseOfResource[i]
+	}
+	//Maybe a check here is needed to make sure that wasted resources are not negative? In case of over 100% use of resources.
+
+	//Generate the actual cost of wasted resources
+	var wastedCost float64 = 0
+	for i, v := range wastedResources {
+		wastedCost += v * nodePrice * m.Balance[i]
+	}
+
+	//Calculate costs
+	costs := make([]float64, len(usagePerContainer))
+	wasteCosts := make([]float64, len(usagePerContainer))
+	len := len(usagePerContainer)
+	lenFloat := float64(len)
+
+	for i, con := range percentUsePerContainer {
+		var sumOfBaseCostForContainer float64 = 0
+		for j, costOfDimensionForContainer := range con {
+			//The cost for the resources used and also the cost for the wasted resources.
+			sumOfBaseCostForContainer += nodePrice * m.Balance[j] * costOfDimensionForContainer
+			//changed, wasted cost same for all resources
+		}
+
+		wasteCosts[i] = (wastedCost / lenFloat) * hours
+		costs[i] = (sumOfBaseCostForContainer)*hours + wasteCosts[i]
+	}
+	return costs, wasteCosts
+
+}
 
 //@Author Erik Gjers
 //A model that only takes the first container and considers the rest of the node wasted. Doesn't add the wasted cost.

@@ -9,9 +9,15 @@ import (
 	"dat067/costestimation/kubernetes"
 	"dat067/costestimation/kubernetes/azure"
 	"dat067/costestimation/models"
+
+	//"dat067/costestimation/models"
 	"dat067/costestimation/prometheus"
+	"net/http"
+
 	officialkube "k8s.io/client-go/kubernetes"
 
+	//http
+	"github.com/gin-gonic/gin"
 	//model shouldn't be needed after test printing functionality removed.
 	"github.com/prometheus/common/model"
 )
@@ -19,9 +25,19 @@ import (
 var clientSet *officialkube.Clientset
 var pricedNodes []kubernetes.PricedNode
 
+type ResponseItem struct {
+	Price          float64 `json:"price"`
+	DeploymentName string  `json:"deployment"`
+}
+
 func main() {
-	endTime := time.Now()
-	startTime := endTime.Add(-24 * time.Hour)
+
+	router := gin.Default()
+	//router.GET("/price", getDeploymentPrices)
+	router.GET("/price/:deployment", getDeploymentPrices)
+
+	//endTime := time.Now()
+	//startTime := endTime.Add(-time.Hour)
 
 	var err error
 	clientSet, err = kubernetes.CreateClientSet()
@@ -38,7 +54,60 @@ func main() {
 		os.Exit(-1)
 	}
 
-	price, err := getDeploymentPrice("prometheus-server", startTime, endTime)
+	address := "http://localhost:9090"
+	prometheus.CreateAPI(address)
+
+	//Testing stuff related to getDeploymentPrice
+	/*
+		testEndTime := time.Now()
+		testDuration := 24 * time.Hour
+		testStartTime := testEndTime.Add(-testDuration)
+		testResult, _, _ := prometheus.GetAvgPodResourceUsageOverTime("aks-default-15038067-vmss000000", testStartTime, testEndTime, testDuration)
+		nodeCPUTest, _, _ := prometheus.GetCPUNodeCapacity("aks-default-15038067-vmss000000", testStartTime)
+		nodeRAMTest, _, _ := prometheus.GetMemoryNodeCapacity("aks-default-15038067-vmss000000", testStartTime)
+		deploymentTest, _, pricesOfPods := getDeploymentPrice(testStartTime, testEndTime, testDuration)
+		podToDeploymentTest := prometheus.GetPodsToDeployment(testEndTime, testDuration)
+		time.Sleep(1 * time.Second)
+		nodeCPUTest2, _, _ := prometheus.GetCPUNodeCapacity("aks-default-15038067-vmss000000", testStartTime)
+		nodeRAMTest2, _, _ := prometheus.GetMemoryNodeCapacity("aks-default-15038067-vmss000000", testStartTime)
+		testResultTwo, _, _ := prometheus.GetAvgPodResourceUsageOverTime("aks-default-15038067-vmss000000", testStartTime, testEndTime, testDuration)
+		deploymentTestTwo, _, pricesOfPods2 := getDeploymentPrice(testStartTime, testEndTime, testDuration)
+		podToDeploymentTestTwo := prometheus.GetPodsToDeployment(testEndTime, testDuration)
+
+		fmt.Printf("\n Nodes: \n First{%f, %f} Second: {%f, %f}\n", nodeCPUTest, nodeRAMTest, nodeCPUTest2, nodeRAMTest2)
+
+		fmt.Printf("Amount of time points: First: {%d}, Second {%d}\n", len(testResult), len(testResultTwo))
+		for i, pod := range testResult {
+			pod2 := testResultTwo[i]
+			fmt.Printf("Length of podsUsages: First: {%d}, Second {%d}\n", len(pod.ResourceUsages), len(pod2.ResourceUsages))
+			for k, v := range pod.ResourceUsages {
+				fmt.Printf("First{%f, %f} Second: {%f, %f}\n", v.CpuUsage, v.MemUsage, pod2.ResourceUsages[k].CpuUsage, pod2.ResourceUsages[k].MemUsage)
+			}
+
+		}
+
+		fmt.Printf("Length of deployment: First: {%d}, Second {%d}\n", len(deploymentTest), len(deploymentTestTwo))
+		for k, v := range deploymentTest {
+			pod2 := deploymentTestTwo[k]
+			fmt.Printf("First{%f} Second: {%f}\n", v, pod2)
+		}
+
+		fmt.Printf("Length of podToDeploments: First: {%d}, Second {%d}\n", len(podToDeploymentTest), len(podToDeploymentTestTwo))
+		for k, v := range podToDeploymentTest {
+			pod2 := podToDeploymentTestTwo[k]
+			fmt.Printf("First{%s} Second: {%s}\n", v, pod2)
+		}
+
+		fmt.Printf("Length of podPrices: First: {%d}, Second {%d}\n", len(pricesOfPods), len(pricesOfPods2))
+		for k, v := range pricesOfPods {
+			pod2 := pricesOfPods2[k]
+			fmt.Printf("First{%f} Second: {%f}\n", v, pod2)
+		}
+		//End of things testing getDeploymentPrice
+	*/
+	router.Run()
+
+	/*price, err := getDeploymentPrice("prometheus-server", startTime, endTime)
 
 	if err != nil {
 		fmt.Println(err)
@@ -55,16 +124,70 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(-1)
-	}
+	}*/
 }
 
-func getDeploymentPrice(deploymentName string, startTime time.Time, endTime time.Time) (float64, error) {
+func getDeploymentPrices(c *gin.Context) {
+	wantedDeployment := c.Param("deployment")
+	//endTime := time.Now()
+	//startTime := endTime.Add(-time.Hour)
+	// in postman URL: http://localhost:8080/price/coredns-autoscaler?startTime=2021-12-24T00:00:00.371Z&endTime=2021-12-25T00:00:00.371Z
+	endTimeStr := c.Query("endTime")
+	fmt.Print("End")
+	fmt.Print(endTimeStr)
+	startTimeStr := c.Query("startTime")
+	fmt.Print(startTimeStr)
+	layout := "2006-01-02T15:04:05.000Z"
+	fmt.Print("Start")
+	fmt.Print(startTimeStr)
+	fmt.Print("End")
+	fmt.Print(endTimeStr)
+	endTime, err := time.Parse(layout, endTimeStr)
+	if err != nil {
+		fmt.Print("ERROR")
+		fmt.Print(err.Error())
+		os.Exit(-1)
+	}
+	startTime, err := time.Parse(layout, startTimeStr)
+	if err != nil {
+		fmt.Print("ERROR")
+		fmt.Print(err.Error())
+		os.Exit(-1)
+	}
+
+	pricedMap, err := getDeploymentPrice(startTime, endTime, endTime.Sub(startTime))
+	if err != nil {
+		c.String(http.StatusInternalServerError, err.Error())
+	}
+
+	priceArray := make([]ResponseItem, len(pricedMap))
+	index := 0
+	for deployment, price := range pricedMap {
+
+		priceInfoStruct := ResponseItem{
+			Price:          price,
+			DeploymentName: deployment,
+		}
+		priceArray[index] = priceInfoStruct
+		index++
+
+	}
+	for i, s := range priceArray {
+		if s.DeploymentName == wantedDeployment {
+			c.JSON(http.StatusOK, priceArray[i])
+			return
+		}
+
+		//couldn't find deployment-name add message
+	}
+	c.JSON(http.StatusNotFound, "deployment not found")
+
+}
+
+func getDeploymentPrice(startTime time.Time, endTime time.Time, resolution time.Duration) (map[string]float64, error) {
 	/*
 	 * The following code queries Prometheus on localhost using the simple "up" query.
 	 */
-	address := "http://localhost:9090"
-	//query := "up"
-	prometheus.CreateAPI(address)
 
 	/* 	switch result.Type() {
 	   	case model.ValVector:
@@ -94,11 +217,11 @@ func getDeploymentPrice(deploymentName string, startTime time.Time, endTime time
 
 	duration := endTime.Sub(startTime)
 	durationHours := duration.Hours()
+	/*
+		var resolution time.Duration = 0
 
-	var resolution time.Duration = 0
-
-	resolution = time.Hour
-
+		resolution = 1 * time.Hour
+	*/
 	/*
 		if resolution == 0 {
 			resolution = duration
@@ -128,7 +251,7 @@ func getDeploymentPrice(deploymentName string, startTime time.Time, endTime time
 
 		for _, podsResourceUsage := range podsResourceUsages {
 			pods := podsResourceUsage.ResourceUsages
-
+			t := podsResourceUsage.Time
 			if err != nil {
 				fmt.Printf("An error occured when querying Prometheus: %v\n", err)
 				os.Exit(1)
@@ -143,8 +266,9 @@ func getDeploymentPrice(deploymentName string, startTime time.Time, endTime time
 
 			cpuUsage := 0.0
 			memUsage := 0.0
-
-			for _, resourceUsage := range pods {
+			orderOfNames := make([]string, len(pods))
+			for name, resourceUsage := range pods {
+				orderOfNames[index] = name
 				monster[index] = []float64{resourceUsage.MemUsage, resourceUsage.CpuUsage}
 				cpuUsage += resourceUsage.CpuUsage
 				memUsage += resourceUsage.MemUsage
@@ -153,8 +277,8 @@ func getDeploymentPrice(deploymentName string, startTime time.Time, endTime time
 
 			//TODO: We get all the pods on a node, even those not belonging to a deployment.
 			//Calculate pods' cost
-			nodeMem, _, _ := prometheus.GetMemoryNodeCapacity(node.Node.Name)
-			nodeCPU, _, _ := prometheus.GetCPUNodeCapacity(node.Node.Name)
+			nodeMem, _, _ := prometheus.GetMemoryNodeCapacity(node.Node.Name, t)
+			nodeCPU, _, _ := prometheus.GetCPUNodeCapacity(node.Node.Name, t)
 			costCalculator := models.GoodModel{Balance: []float64{1, 1}}
 			price, wastedCost := costCalculator.CalculateCost(
 				[]float64{
@@ -164,7 +288,7 @@ func getDeploymentPrice(deploymentName string, startTime time.Time, endTime time
 				node.Price, resolution.Hours())
 			index = 0
 			totalPodPrice := 0.0
-			for pod := range pods {
+			for _, pod := range orderOfNames {
 				if wastedCost[index] < 0 {
 					fmt.Printf("The wasted cost for pod %s is %f\n", pod, wastedCost[index])
 				}
@@ -188,7 +312,7 @@ func getDeploymentPrice(deploymentName string, startTime time.Time, endTime time
 		}
 	}
 
-	deploymentMap := prometheus.GetPodsToDeployment(duration)
+	deploymentMap := prometheus.GetPodsToDeployment(endTime, duration)
 
 	//Sum all pod costs to relevant deployment cost.
 	priceMap := make(map[string]float64)
@@ -268,13 +392,7 @@ func getDeploymentPrice(deploymentName string, startTime time.Time, endTime time
 
 		printMatrix(memUsage)*/
 
-	returnPrice, ok := priceMap[deploymentName]
-
-	if !ok {
-		return -1, fmt.Errorf("The name '%s' is not a valid deployment\n", deploymentName)
-	}
-
-	return returnPrice, nil
+	return priceMap, nil
 }
 
 func printVector(v model.Vector) {

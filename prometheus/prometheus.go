@@ -126,6 +126,8 @@ func matrixToVectorMap(matrix model.Matrix) (map[time.Time]model.Vector, error) 
 	for _, sampleStream := range matrix {
 		//fmt.Println(sampleStream.Metric)
 
+		//fmt.Println(sampleStream.Metric)
+
 		for _, samplePair := range sampleStream.Values {
 			vector, ok := vectorMap[samplePair.Timestamp.Time()]
 
@@ -218,9 +220,9 @@ func GetAvgPodResourceUsageOverTime(node string, startTime time.Time, endTime ti
 }
 
 // Gets available CPU capacity
-func GetCPUNodeCapacity(node string) (float64, promv1.Warnings, error) {
-	strBuilder := fmt.Sprintf("kube_node_status_capacity{resource='cpu', exported_node='%s'}", node)
-	result, warnings, err := Query(strBuilder, localAPI, time.Now())
+func GetCPUNodeCapacity(node string, t time.Time) (float64, promv1.Warnings, error) {
+	strBuilder := fmt.Sprintf("kube_node_status_capacity{resource='cpu', node='%s'}", node)
+	result, warnings, err := Query(strBuilder, localAPI, t)
 	vector := result.(model.Vector)
 	sample := vector[0]
 	valueField := sample.Value
@@ -228,9 +230,9 @@ func GetCPUNodeCapacity(node string) (float64, promv1.Warnings, error) {
 	return value, warnings, err
 }
 
-func GetMemoryNodeCapacity(node string) (float64, promv1.Warnings, error) {
-	strBuilder := fmt.Sprintf("kube_node_status_capacity{resource='memory', exported_node='%s'}", node)
-	result, warnings, err := Query(strBuilder, localAPI, time.Now())
+func GetMemoryNodeCapacity(node string, t time.Time) (float64, promv1.Warnings, error) {
+	strBuilder := fmt.Sprintf("kube_node_status_capacity{resource='memory', node='%s'}", node)
+	result, warnings, err := Query(strBuilder, localAPI, t)
 	vector := result.(model.Vector)
 	sample := vector[0]
 	valueField := sample.Value
@@ -238,17 +240,17 @@ func GetMemoryNodeCapacity(node string) (float64, promv1.Warnings, error) {
 	return value, warnings, err
 }
 
-func GetCPUNodeUsage(node string) (float64, promv1.Warnings, error) {
-	return getNodeResourceUsageQuery("cpu", node)
+func GetCPUNodeUsage(t time.Time, node string) (float64, promv1.Warnings, error) {
+	return getNodeResourceUsageQuery("cpu", node, t)
 }
 
-func GetMemoryNodeUsage(node string) (float64, promv1.Warnings, error) {
-	return getNodeResourceUsageQuery("memory", node)
+func GetMemoryNodeUsage(t time.Time, node string) (float64, promv1.Warnings, error) {
+	return getNodeResourceUsageQuery("memory", node, t)
 }
 
-func getNodeResourceUsageQuery(resource string, node string) (float64, promv1.Warnings, error) {
-	resourceUsageQuery := fmt.Sprintf("kube_node_status_capacity{resource='%s', exported_node='%s'} - avg_over_time(kube_node_status_allocatable{resource='%s', exported_node='%s'}[1h])", resource, node, resource, node)
-	result, warnings, err := Query(resourceUsageQuery, localAPI, time.Now())
+func getNodeResourceUsageQuery(resource string, node string, t time.Time) (float64, promv1.Warnings, error) {
+	resourceUsageQuery := fmt.Sprintf("kube_node_status_capacity{resource='%s', node='%s'} - avg_over_time(kube_node_status_allocatable{resource='%s', node='%s'}[1h])", resource, node, resource, node)
+	result, warnings, err := Query(resourceUsageQuery, localAPI, t)
 	vector := result.(model.Vector)
 	sample := vector[0]
 	valueField := sample.Value
@@ -387,10 +389,10 @@ func GetPodsResourceUsage(node string, startTime time.Time, endTime time.Time) (
  *Returns map with replicaset as key and deployment it belong to as value
  *
  */
-func getReplicasetToDeployment(duration time.Duration) (map[string]string, promv1.Warnings, error) {
+func getReplicasetToDeployment(t time.Time, duration time.Duration) (map[string]string, promv1.Warnings, error) {
 	//creat query that gets all pods in cluster
 
-	result, warnings, err := Query(fmt.Sprintf("count_over_time(kube_replicaset_owner{owner_kind='Deployment'}[%s])", duration), localAPI, time.Now())
+	result, warnings, err := Query(fmt.Sprintf("count_over_time(kube_replicaset_owner{owner_kind='Deployment'}[%s])", duration), localAPI, t)
 	vector, ok := result.(model.Vector)
 
 	if !ok {
@@ -419,10 +421,10 @@ func getReplicasetToDeployment(duration time.Duration) (map[string]string, promv
 *Returns a map with pod as key and which replicaset it belongs to as value
 *
  */
-func getPodsToReplicaset(duration time.Duration) (map[string]string, promv1.Warnings, error) {
+func getPodsToReplicaset(t time.Time, duration time.Duration) (map[string]string, promv1.Warnings, error) {
 	//creat query that gets all pods in cluster
 
-	result, warnings, err := Query(fmt.Sprintf("count_over_time(kube_pod_owner{owner_kind='ReplicaSet'}[%s])", duration), localAPI, time.Now())
+	result, warnings, err := Query(fmt.Sprintf("count_over_time(kube_pod_owner{owner_kind='ReplicaSet'}[%s])", duration), localAPI, t)
 
 	vector, ok := result.(model.Vector)
 
@@ -452,18 +454,18 @@ func getPodsToReplicaset(duration time.Duration) (map[string]string, promv1.Warn
 *Returns map with keys as pod and value as deployment
 *Gives out which deployment each pod belongs to
  */
-func GetPodsToDeployment(duration time.Duration) map[string]string {
+func GetPodsToDeployment(t time.Time, duration time.Duration) map[string]string {
 	repTodep := make(map[string]string)
 	podsToRep := make(map[string]string)
 	resultMap := make(map[string]string)
-	podsToRep, warnings, err := getPodsToReplicaset(duration)
+	podsToRep, warnings, err := getPodsToReplicaset(t, duration)
 	if warnings != nil {
 		println("kube_pod_owner warning")
 	}
 	if err != nil {
 		println("kube_pod_owner error")
 	}
-	repTodep, warnings, err = getReplicasetToDeployment(duration)
+	repTodep, warnings, err = getReplicasetToDeployment(t, duration)
 	if warnings != nil {
 		println("kube_pod_owner warning")
 	}
@@ -488,9 +490,9 @@ func GetPodsToDeployment(duration time.Duration) map[string]string {
 *Returns a string slice with all pods in a specific node. Take in node as argument
 *
  */
-func GetPodsOfNode(node string, duration time.Duration) ([]string, promv1.Warnings, error) {
-	strBuilder := fmt.Sprintf("count_over_time(kube_pod_info{exported_node='%s'}[%s])", node, duration)
-	result, warnings, err := Query(strBuilder, localAPI, time.Now())
+func GetPodsOfNode(t time.Time, node string, duration time.Duration) ([]string, promv1.Warnings, error) {
+	strBuilder := fmt.Sprintf("count_over_time(kube_pod_info{node='%s'}[%s])", node, duration)
+	result, warnings, err := Query(strBuilder, localAPI, t)
 
 	vector, ok := result.(model.Vector)
 
