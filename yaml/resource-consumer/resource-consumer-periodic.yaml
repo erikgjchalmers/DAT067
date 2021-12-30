@@ -1,0 +1,69 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: resource-consumer-periodic
+spec:
+  selector:
+    app: resource-consumer-periodic
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: resource-consumer-periodic
+  labels:
+    name: resource-consumer-periodic
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: resource-consumer-periodic
+  template:
+    metadata:
+      labels:
+        app: resource-consumer-periodic
+    spec:
+      containers:
+        - name: resource-consumer-periodic
+          image: gcr.io/k8s-staging-e2e-test-images/resource-consumer:1.9
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              cpu: 300m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: curl-resource-consumer-periodic
+spec:
+  schedule: "*/10 * * * *"
+  concurrencyPolicy: Replace
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: curl-cpu
+            image: curlimages/curl
+            imagePullPolicy: IfNotPresent
+            args:
+              - -d
+              - "millicores=300&durationSec=300"
+              - http://resource-consumer-periodic:8080/ConsumeCPU
+          - name: curl-mem
+            image: curlimages/curl
+            imagePullPolicy: IfNotPresent
+            args:
+              - -d
+              - "megabytes=256&durationSec=300"
+              - http://resource-consumer-periodic:8080/ConsumeMem
+          restartPolicy: OnFailure
