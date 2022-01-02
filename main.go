@@ -43,22 +43,25 @@ func main() {
 	//startTime := endTime.Add(-time.Hour)
 
 	var err error
+	fmt.Println("Before kubernetes clientSet")
 	clientSet, err = kubernetes.CreateClientSet()
-
+	fmt.Println("After kubernetes clientSet")
 	if err != nil {
 		fmt.Errorf("An error occured when creating the Kubernetes client: '%v'", err)
 		os.Exit(-1)
 	}
-
+	fmt.Println("Before getting price from Azure")
 	pricedNodes, err = azure.GetPricedAzureNodes(clientSet)
-
+	fmt.Println("After getting price from Azure")
 	if err != nil {
 		fmt.Errorf("An error occured while retrieving Azure node prices: '%v'", err)
 		os.Exit(-1)
 	}
-
+	fmt.Println("Before Prometheus API")
 	prometheus.CreateAPI(*address)
+	fmt.Println("After Prometheus API")
 	router.Run()
+	fmt.Println("After staring Gin router")
 }
 
 func getDeploymentPrices(c *gin.Context) {
