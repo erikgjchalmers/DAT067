@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"math"
 	"os"
@@ -31,6 +32,8 @@ type ResponseItem struct {
 }
 
 func main() {
+	address := flag.String("url", "http://localhost:9090", "Put the address here, dummy!")
+	flag.Parse()
 
 	router := gin.Default()
 	//router.GET("/price", getDeploymentPrices)
@@ -54,8 +57,7 @@ func main() {
 		os.Exit(-1)
 	}
 
-	address := "http://localhost:9090"
-	prometheus.CreateAPI(address)
+	prometheus.CreateAPI(*address)
 	router.Run()
 }
 
@@ -64,7 +66,7 @@ func getDeploymentPrices(c *gin.Context) {
 	// in postman URL: http://localhost:8080/price/coredns-autoscaler?startTime=2021-12-24T00:00:00.371Z&endTime=2021-12-25T00:00:00.371Z
 	endTimeStr := c.Query("endTime")
 	startTimeStr := c.Query("startTime")
-	resolutionStr := c.Query("resolution")
+	resolutionStr := c.DefaultQuery("resolution", "None")
 	layout := "2006-01-02T15:04:05.000Z"
 
 	endTime, err := time.Parse(layout, endTimeStr)
@@ -80,17 +82,24 @@ func getDeploymentPrices(c *gin.Context) {
 		fmt.Print(err.Error())
 		os.Exit(-1)
 	}
-
-	resolution, err := time.ParseDuration(resolutionStr)
-	if err != nil {
-		fmt.Print("ERROR")
-		fmt.Print(err.Error())
-		os.Exit(-1)
-	}
-
-	pricedMap, err := getDeploymentPrice(startTime, endTime, resolution)
-	if err != nil {
-		c.String(http.StatusInternalServerError, err.Error())
+	var pricedMap map[string]float64
+	//Abomination below
+	if resolutionStr != "None" {
+		resolution, err := time.ParseDuration(resolutionStr)
+		if err != nil {
+			fmt.Print("ERROR")
+			fmt.Print(err.Error())
+			os.Exit(-1)
+		}
+		pricedMap, err = getDeploymentPrice(startTime, endTime, resolution)
+		if err != nil {
+			c.String(http.StatusInternalServerError, err.Error())
+		}
+	} else {
+		pricedMap, err = getDeploymentPriceOverPeriod(startTime, endTime)
+		if err != nil {
+			c.String(http.StatusInternalServerError, err.Error())
+		}
 	}
 
 	priceArray := make([]ResponseItem, len(pricedMap))
@@ -116,11 +125,13 @@ func getDeploymentPrices(c *gin.Context) {
 	c.JSON(http.StatusNotFound, "deployment not found")
 
 }
+func getDeploymentPriceOverPeriod(startTime time.Time, endTime time.Time) (map[string]float64, error) {
+	return getDeploymentPrice(startTime, endTime, endTime.Sub(startTime))
+}
 
 func getDeploymentPrice(startTime time.Time, endTime time.Time, resolution time.Duration) (map[string]float64, error) {
 
 	duration := endTime.Sub(startTime)
-	durationHours := duration.Hours()
 	podPrices := make(map[string]float64)
 	for _, node := range pricedNodes {
 		podsResourceUsages, warnings, err := prometheus.GetAvgPodResourceUsageOverTime(node.Node.Name, startTime, endTime, resolution)
@@ -142,10 +153,11 @@ func getDeploymentPrice(startTime time.Time, endTime time.Time, resolution time.
 			}
 		}
 	}
+	return groupPodPricesToDeployment(podPrices, endTime, duration), nil
+}
 
+func groupPodPricesToDeployment(podPrices map[string]float64, endTime time.Time, duration time.Duration) map[string]float64 {
 	deploymentMap := prometheus.GetPodsToDeployment(endTime, duration)
-
-	//Sum all pod costs to relevant deployment cost.
 	priceMap := make(map[string]float64)
 
 	for pod, deployment := range deploymentMap {
@@ -165,8 +177,8 @@ func getDeploymentPrice(startTime time.Time, endTime time.Time, resolution time.
 	fmt.Printf("\nNode prices: \n")
 	sumNode := 0.0
 	for _, node := range pricedNodes {
-		fmt.Printf("Node %s costs %f.\n", node.Node.Name, durationHours*node.Price)
-		sumNode += durationHours * node.Price
+		fmt.Printf("Node %s costs %f.\n", node.Node.Name, duration.Hours()*node.Price)
+		sumNode += duration.Hours() * node.Price
 	}
 	sumPrice := 0.0
 	for _, v := range podPrices {
@@ -177,10 +189,8 @@ func getDeploymentPrice(startTime time.Time, endTime time.Time, resolution time.
 		sumPriceMap += v
 	}
 	fmt.Printf("Cost of nodes was %f. Total cost of pods was %f. \nThe pods being used in deployments amount to %f. \n", sumNode, sumPrice, sumPriceMap)
-
-	return priceMap, nil
+	return priceMap
 }
-
 func getPrice(podsResourceUsage prometheus.ResourceUsageSample, node kubernetes.PricedNode, resolution time.Duration) map[string]float64 {
 	podPrices := make(map[string]float64)
 	pods := podsResourceUsage.ResourceUsages
