@@ -59,20 +59,25 @@ func main() {
 
 	//Testing stuff related to getDeploymentPrice
 	/*
-		testEndTime := time.Now()
-		testDuration := 24 * time.Hour
+		nodeToTest := "aks-standard1-15038067-vmss000002"
+		layout := "2006-01-02T15:04:05.000Z"
+		testEndTime, _ := time.Parse(layout, "2021-12-31T12:00:00.000Z")
+		testDuration := 1 * time.Hour
 		testStartTime := testEndTime.Add(-testDuration)
-		testResult, _, _ := prometheus.GetAvgPodResourceUsageOverTime("aks-default-15038067-vmss000000", testStartTime, testEndTime, testDuration)
-		nodeCPUTest, _, _ := prometheus.GetCPUNodeCapacity("aks-default-15038067-vmss000000", testStartTime)
-		nodeRAMTest, _, _ := prometheus.GetMemoryNodeCapacity("aks-default-15038067-vmss000000", testStartTime)
-		deploymentTest, _, pricesOfPods := getDeploymentPrice(testStartTime, testEndTime, testDuration)
+		testResult, _, _ := prometheus.GetAvgPodResourceUsageOverTime(nodeToTest, testStartTime, testEndTime, testDuration)
+		nodeCPUTest, _, _ := prometheus.GetCPUNodeCapacity(nodeToTest, testStartTime)
+		nodeRAMTest, _, _ := prometheus.GetMemoryNodeCapacity(nodeToTest, testStartTime)
+		deploymentTest, _ := getDeploymentPrice(testStartTime, testEndTime, testDuration)
 		podToDeploymentTest := prometheus.GetPodsToDeployment(testEndTime, testDuration)
+
 		time.Sleep(1 * time.Second)
-		nodeCPUTest2, _, _ := prometheus.GetCPUNodeCapacity("aks-default-15038067-vmss000000", testStartTime)
-		nodeRAMTest2, _, _ := prometheus.GetMemoryNodeCapacity("aks-default-15038067-vmss000000", testStartTime)
-		testResultTwo, _, _ := prometheus.GetAvgPodResourceUsageOverTime("aks-default-15038067-vmss000000", testStartTime, testEndTime, testDuration)
-		deploymentTestTwo, _, pricesOfPods2 := getDeploymentPrice(testStartTime, testEndTime, testDuration)
+		nodeCPUTest2, _, _ := prometheus.GetCPUNodeCapacity(nodeToTest, testStartTime)
+		nodeRAMTest2, _, _ := prometheus.GetMemoryNodeCapacity(nodeToTest, testStartTime)
+		testResultTwo, _, _ := prometheus.GetAvgPodResourceUsageOverTime(nodeToTest, testStartTime, testEndTime, testDuration)
+		deploymentTestTwo, _ := getDeploymentPrice(testStartTime, testEndTime, testDuration)
 		podToDeploymentTestTwo := prometheus.GetPodsToDeployment(testEndTime, testDuration)
+
+		fmt.Printf("Start time: %s \nEnd time: %s\n\n\n", testStartTime, testEndTime)
 
 		fmt.Printf("\n Nodes: \n First{%f, %f} Second: {%f, %f}\n", nodeCPUTest, nodeRAMTest, nodeCPUTest2, nodeRAMTest2)
 
@@ -81,7 +86,7 @@ func main() {
 			pod2 := testResultTwo[i]
 			fmt.Printf("Length of podsUsages: First: {%d}, Second {%d}\n", len(pod.ResourceUsages), len(pod2.ResourceUsages))
 			for k, v := range pod.ResourceUsages {
-				fmt.Printf("First{%f, %f} Second: {%f, %f}\n", v.CpuUsage, v.MemUsage, pod2.ResourceUsages[k].CpuUsage, pod2.ResourceUsages[k].MemUsage)
+				fmt.Printf("Pod: %s\nFirst{%f, %f} Second: {%f, %f}\n", k, v.CpuUsage, v.MemUsage, pod2.ResourceUsages[k].CpuUsage, pod2.ResourceUsages[k].MemUsage)
 			}
 
 		}
@@ -98,13 +103,15 @@ func main() {
 			fmt.Printf("First{%s} Second: {%s}\n", v, pod2)
 		}
 
-		fmt.Printf("Length of podPrices: First: {%d}, Second {%d}\n", len(pricesOfPods), len(pricesOfPods2))
-		for k, v := range pricesOfPods {
-			pod2 := pricesOfPods2[k]
-			fmt.Printf("First{%f} Second: {%f}\n", v, pod2)
-		}
-		//End of things testing getDeploymentPrice
+			fmt.Printf("Length of podPrices: First: {%d}, Second {%d}\n", len(pricesOfPods), len(pricesOfPods2))
+			for k, v := range pricesOfPods {
+				pod2 := pricesOfPods2[k]
+				fmt.Printf("First{%f} Second: {%f}\n", v, pod2)
+			}
+
 	*/
+	//End of things testing getDeploymentPrice
+
 	router.Run()
 
 	/*price, err := getDeploymentPrice("prometheus-server", startTime, endTime)
@@ -137,6 +144,7 @@ func getDeploymentPrices(c *gin.Context) {
 	fmt.Print(endTimeStr)
 	startTimeStr := c.Query("startTime")
 	fmt.Print(startTimeStr)
+	resolutionStr := c.Query("resolution")
 	layout := "2006-01-02T15:04:05.000Z"
 	fmt.Print("Start")
 	fmt.Print(startTimeStr)
@@ -154,8 +162,14 @@ func getDeploymentPrices(c *gin.Context) {
 		fmt.Print(err.Error())
 		os.Exit(-1)
 	}
+	resolution, err := time.ParseDuration(resolutionStr)
+	if err != nil {
+		fmt.Print("ERROR")
+		fmt.Print(err.Error())
+		os.Exit(-1)
+	}
 
-	pricedMap, err := getDeploymentPrice(startTime, endTime, endTime.Sub(startTime))
+	pricedMap, err := getDeploymentPrice(startTime, endTime, resolution)
 	if err != nil {
 		c.String(http.StatusInternalServerError, err.Error())
 	}
@@ -234,9 +248,7 @@ func getDeploymentPrice(startTime time.Time, endTime time.Time, resolution time.
 
 	//Get pods
 	//Get pod resources
-
 	podPrices := make(map[string]float64)
-
 	for _, node := range pricedNodes {
 		podsResourceUsages, warnings, err := prometheus.GetAvgPodResourceUsageOverTime(node.Node.Name, startTime, endTime, resolution)
 
@@ -250,64 +262,10 @@ func getDeploymentPrice(startTime time.Time, endTime time.Time, resolution time.
 		}
 
 		for _, podsResourceUsage := range podsResourceUsages {
-			pods := podsResourceUsage.ResourceUsages
-			t := podsResourceUsage.Time
-			if err != nil {
-				fmt.Printf("An error occured when querying Prometheus: %v\n", err)
-				os.Exit(1)
-			}
 
-			if len(warnings) > 0 {
-				fmt.Printf("Warnings during query: %v\n", warnings)
-			}
-
-			monster := make([][]float64, len(pods))
-			index := 0
-
-			cpuUsage := 0.0
-			memUsage := 0.0
-			orderOfNames := make([]string, len(pods))
-			for name, resourceUsage := range pods {
-				orderOfNames[index] = name
-				monster[index] = []float64{resourceUsage.MemUsage, resourceUsage.CpuUsage}
-				cpuUsage += resourceUsage.CpuUsage
-				memUsage += resourceUsage.MemUsage
-				index += 1
-			}
-
-			//TODO: We get all the pods on a node, even those not belonging to a deployment.
-			//Calculate pods' cost
-			nodeMem, _, _ := prometheus.GetMemoryNodeCapacity(node.Node.Name, t)
-			nodeCPU, _, _ := prometheus.GetCPUNodeCapacity(node.Node.Name, t)
-			costCalculator := models.GoodModel{Balance: []float64{1, 1}}
-			price, wastedCost := costCalculator.CalculateCost(
-				[]float64{
-					nodeMem,
-					nodeCPU},
-				monster,
-				node.Price, resolution.Hours())
-			index = 0
-			totalPodPrice := 0.0
-			for _, pod := range orderOfNames {
-				if wastedCost[index] < 0 {
-					fmt.Printf("The wasted cost for pod %s is %f\n", pod, wastedCost[index])
-				}
-
-				totalPodPrice += price[index]
-				podPrices[pod] += price[index]
-				index += 1
-			}
-
-			if cpuUsage > nodeCPU {
-				fmt.Printf("Cpu usage too high for pods on node %s\n", node.Node.Name)
-			}
-
-			if memUsage > nodeMem {
-				fmt.Printf("Mem usage too high for pods on node %s\n", node.Node.Name)
-			}
-
-			if math.Abs(totalPodPrice-resolution.Hours()*node.Price) > 1e-10 {
-				fmt.Printf("The sum of the pod prices is %f. The node price is %f\n", totalPodPrice, resolution.Hours()*node.Price)
+			tmap := getPrice(podsResourceUsage, node, resolution)
+			for k, v := range tmap {
+				podPrices[k] += v
 			}
 		}
 	}
@@ -393,6 +351,62 @@ func getDeploymentPrice(startTime time.Time, endTime time.Time, resolution time.
 		printMatrix(memUsage)*/
 
 	return priceMap, nil
+}
+
+func getPrice(podsResourceUsage prometheus.ResourceUsageSample, node kubernetes.PricedNode, resolution time.Duration) map[string]float64 {
+	podPrices := make(map[string]float64)
+	pods := podsResourceUsage.ResourceUsages
+	t := podsResourceUsage.Time
+
+	monster := make([][]float64, len(pods))
+	index := 0
+
+	cpuUsage := 0.0
+	memUsage := 0.0
+	orderOfNames := make([]string, len(pods))
+	for name, resourceUsage := range pods {
+		orderOfNames[index] = name
+		monster[index] = []float64{resourceUsage.MemUsage, resourceUsage.CpuUsage}
+		cpuUsage += resourceUsage.CpuUsage
+		memUsage += resourceUsage.MemUsage
+		index += 1
+	}
+
+	//TODO: We get all the pods on a node, even those not belonging to a deployment.
+	//Calculate pods' cost
+	nodeMem, _, _ := prometheus.GetMemoryNodeCapacity(node.Node.Name, t)
+	nodeCPU, _, _ := prometheus.GetCPUNodeCapacity(node.Node.Name, t)
+	costCalculator := models.GoodModel{Balance: []float64{1, 1}}
+	price, wastedCost := costCalculator.CalculateCost(
+		[]float64{
+			nodeMem,
+			nodeCPU},
+		monster,
+		node.Price, resolution.Hours())
+	index = 0
+	totalPodPrice := 0.0
+	for _, pod := range orderOfNames {
+		if wastedCost[index] < 0 {
+			fmt.Printf("The wasted cost for pod %s is %f\n", pod, wastedCost[index])
+		}
+
+		totalPodPrice += price[index]
+		podPrices[pod] += price[index]
+		index += 1
+	}
+
+	if cpuUsage > nodeCPU {
+		fmt.Printf("Cpu usage too high for pods on node %s\n", node.Node.Name)
+	}
+
+	if memUsage > nodeMem {
+		fmt.Printf("Mem usage too high for pods on node %s\n", node.Node.Name)
+	}
+
+	if math.Abs(totalPodPrice-resolution.Hours()*node.Price) > 1e-10 {
+		fmt.Printf("The sum of the pod prices is %f. The node price is %f\n", totalPodPrice, resolution.Hours()*node.Price)
+	}
+	return podPrices
 }
 
 func printVector(v model.Vector) {

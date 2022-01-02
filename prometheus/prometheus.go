@@ -154,7 +154,7 @@ func GetAvgPodResourceUsageOverTime(node string, startTime time.Time, endTime ti
 	duration := endTime.Sub(startTime)
 
 	if duration >= resolution {
-		endTime = endTime.Add(-resolution)
+		startTime = startTime.Add(resolution)
 	}
 
 	cpuUsages, cpuWarnings, cpuErrors := GetAvgPodCpuUsageOverTime(node, startTime, endTime, resolution)
